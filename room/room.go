@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/fogleman/pt/pt"
+	"github.com/hpinc/go3mf"
 )
 
 type Shot struct {
@@ -22,19 +23,70 @@ type Wall struct {
 }
 
 type Room struct {
-	walls []Wall
+	// walls []Wall
+	m *pt.Mesh
 }
 
-// func (r *Room) GetWallContainingPoint(pt.Vector) (Wall, bool) {
-// 	for _, wall := range r.walls {
-// 		for _, triangle := range wall.mesh.Triangles {
-// 		}
-// 	}
-// 	return Wall{}, true
-// }
+var WallMaterials = map[string]Material{
+	"default": {0.9},
+}
 
-func (r *Room) mesh() (pt.Mesh, error) {
-	return pt.Mesh{}, nil
+func NewRoom(filepath string) (Room, error) {
+	var model go3mf.Model
+	r, err := go3mf.OpenReader(filepath)
+	if err != nil {
+		return Room{}, err
+	}
+	r.Decode(&model)
+
+	room := Room{}
+
+	ptTriangles := []*pt.Triangle{}
+	for _, item := range model.Build.Items {
+		obj, _ := model.FindObject(item.ObjectPath(), item.ObjectID)
+		fmt.Println("object:", *obj)
+
+		var material Material
+		if _, ok := WallMaterials[obj.Name]; ok {
+			material = WallMaterials[obj.Name]
+		} else {
+			material = WallMaterials["default"]
+		}
+		ptMaterial := pt.Material{Reflectivity: 1.0 - material.Alpha}
+
+		if obj.Mesh != nil {
+			for _, t := range obj.Mesh.Triangles.Triangle {
+				ptTri := &pt.Triangle{}
+				ptTri.Material = &ptMaterial
+				ptTri.V1 = pt.Vector{
+					X: float64(obj.Mesh.Vertices.Vertex[t.V1].X()),
+					Y: float64(obj.Mesh.Vertices.Vertex[t.V1].Y()),
+					Z: float64(obj.Mesh.Vertices.Vertex[t.V1].Z()),
+				}
+				ptTri.V2 = pt.Vector{
+					X: float64(obj.Mesh.Vertices.Vertex[t.V2].X()),
+					Y: float64(obj.Mesh.Vertices.Vertex[t.V2].Y()),
+					Z: float64(obj.Mesh.Vertices.Vertex[t.V2].Z()),
+				}
+				ptTri.V3 = pt.Vector{
+					X: float64(obj.Mesh.Vertices.Vertex[t.V3].X()),
+					Y: float64(obj.Mesh.Vertices.Vertex[t.V3].Y()),
+					Z: float64(obj.Mesh.Vertices.Vertex[t.V3].Z()),
+				}
+				ptTri.FixNormals()
+				ptTriangles = append(ptTriangles, ptTri)
+			}
+		}
+
+		// TODO: link each triangle to the name of its shape in the 3mf file
+	}
+	room.m = pt.NewMesh(ptTriangles)
+	return room, nil
+}
+
+func (r *Room) mesh() (*pt.Mesh, error) {
+	return r.m, nil
+	// return pt.Mesh{}, nil
 }
 
 // TraceParams contains parameters to guide tracing
@@ -82,11 +134,7 @@ func (r *Room) traceShot(shot Shot, destination pt.Vector, params TraceParams) (
 			return NoHit, fmt.Errorf("Nonterminating ray")
 		}
 		hitPositions = append(hitPositions, hit.HitInfo.Position)
-		surface, ok := r.GetWallContainingPoint(hit.HitInfo.Position)
-		if !ok {
-			return NoHit, fmt.Errorf("Couldn't find surface")
-		}
-		gain = gain * surface.material.Alpha
+		gain = gain * (1 - hit.HitInfo.Material.Reflectivity)
 		distance = distance + hit.T // TODO: not totally sure about this
 
 		distFromRFZ := math.Abs(destination.Sub(hit.HitInfo.Position).Length())
