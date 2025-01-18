@@ -6,4 +6,5 @@ require (
 	github.com/fogleman/pt v0.0.0-20170619012416-6fa0015c2178 // indirect
 	github.com/hpinc/go3mf v0.24.2 // indirect
 	github.com/qmuntal/opc v0.7.10 // indirect
+	github.com/sgreben/piecewiselinear v1.2.0 // indirect
 )
