@@ -8,28 +8,26 @@ import (
 	"github.com/hpinc/go3mf"
 )
 
-type Shot struct {
-	ray pt.Ray
-}
-
 type Material struct {
 	Alpha float64
 }
 
-type Wall struct {
-	Name     string
-	material Material
-	mesh     pt.Mesh
-}
+// type Wall struct {
+// 	Name     string
+// 	material Material
+// 	mesh     pt.Mesh
+// }
 
 type Room struct {
 	// walls []Wall
-	m *pt.Mesh
+	M *pt.Mesh
 }
 
 var WallMaterials = map[string]Material{
-	"default": {0.9},
+	"default": {0.3},
 }
+
+const SCALE = 1000
 
 func NewRoom(filepath string) (Room, error) {
 	var model go3mf.Model
@@ -44,7 +42,7 @@ func NewRoom(filepath string) (Room, error) {
 	ptTriangles := []*pt.Triangle{}
 	for _, item := range model.Build.Items {
 		obj, _ := model.FindObject(item.ObjectPath(), item.ObjectID)
-		fmt.Println("object:", *obj)
+		// fmt.Println("object:", *obj)
 
 		var material Material
 		if _, ok := WallMaterials[obj.Name]; ok {
@@ -52,26 +50,26 @@ func NewRoom(filepath string) (Room, error) {
 		} else {
 			material = WallMaterials["default"]
 		}
-		ptMaterial := pt.Material{Reflectivity: 1.0 - material.Alpha}
+		ptMaterial := pt.Material{Reflectivity: material.Alpha}
 
 		if obj.Mesh != nil {
 			for _, t := range obj.Mesh.Triangles.Triangle {
 				ptTri := &pt.Triangle{}
 				ptTri.Material = &ptMaterial
 				ptTri.V1 = pt.Vector{
-					X: float64(obj.Mesh.Vertices.Vertex[t.V1].X()),
-					Y: float64(obj.Mesh.Vertices.Vertex[t.V1].Y()),
-					Z: float64(obj.Mesh.Vertices.Vertex[t.V1].Z()),
+					X: float64(obj.Mesh.Vertices.Vertex[t.V1].X() / SCALE),
+					Y: float64(obj.Mesh.Vertices.Vertex[t.V1].Y() / SCALE),
+					Z: float64(obj.Mesh.Vertices.Vertex[t.V1].Z() / SCALE),
 				}
 				ptTri.V2 = pt.Vector{
-					X: float64(obj.Mesh.Vertices.Vertex[t.V2].X()),
-					Y: float64(obj.Mesh.Vertices.Vertex[t.V2].Y()),
-					Z: float64(obj.Mesh.Vertices.Vertex[t.V2].Z()),
+					X: float64(obj.Mesh.Vertices.Vertex[t.V2].X() / SCALE),
+					Y: float64(obj.Mesh.Vertices.Vertex[t.V2].Y() / SCALE),
+					Z: float64(obj.Mesh.Vertices.Vertex[t.V2].Z() / SCALE),
 				}
 				ptTri.V3 = pt.Vector{
-					X: float64(obj.Mesh.Vertices.Vertex[t.V3].X()),
-					Y: float64(obj.Mesh.Vertices.Vertex[t.V3].Y()),
-					Z: float64(obj.Mesh.Vertices.Vertex[t.V3].Z()),
+					X: float64(obj.Mesh.Vertices.Vertex[t.V3].X() / SCALE),
+					Y: float64(obj.Mesh.Vertices.Vertex[t.V3].Y() / SCALE),
+					Z: float64(obj.Mesh.Vertices.Vertex[t.V3].Z() / SCALE),
 				}
 				ptTri.FixNormals()
 				ptTriangles = append(ptTriangles, ptTri)
@@ -80,12 +78,13 @@ func NewRoom(filepath string) (Room, error) {
 
 		// TODO: link each triangle to the name of its shape in the 3mf file
 	}
-	room.m = pt.NewMesh(ptTriangles)
+	room.M = pt.NewMesh(ptTriangles)
+	room.M.Compile()
 	return room, nil
 }
 
 func (r *Room) mesh() (*pt.Mesh, error) {
-	return r.m, nil
+	return r.M, nil
 	// return pt.Mesh{}, nil
 }
 
@@ -119,7 +118,15 @@ const INF = 1e9
 
 var NoHit = Arrival{Gain: 0.0, Distance: INF}
 
-func (r *Room) traceShot(shot Shot, destination pt.Vector, params TraceParams) (Arrival, error) {
+func nearestApproach(ray pt.Ray, point pt.Vector) float64 {
+	diff := point.Sub(ray.Origin)
+	if diff.Length() == 0 {
+		return 0
+	}
+	return math.Abs(ray.Direction.Dot(diff) - diff.Length())
+}
+
+func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Arrival, error) {
 	mesh, err := r.mesh()
 	if err != nil {
 		return Arrival{}, err
@@ -127,35 +134,38 @@ func (r *Room) traceShot(shot Shot, destination pt.Vector, params TraceParams) (
 	currentRay := shot.ray
 	gain := 1.0
 	distance := 0.0
-	hitPositions := []pt.Vector{}
+	hitPositions := make([]pt.Vector, 0)
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(shot.ray)
 		if !hit.Ok() {
 			return NoHit, fmt.Errorf("Nonterminating ray")
 		}
-		hitPositions = append(hitPositions, hit.HitInfo.Position)
-		gain = gain * (1 - hit.HitInfo.Material.Reflectivity)
-		distance = distance + hit.T // TODO: not totally sure about this
+		info := hit.Info(shot.ray)
+		hitPositions = append(hitPositions, info.Position)
+		gain = gain * (1 - info.Material.Reflectivity)
+		distance = distance + hit.T
 
-		distFromRFZ := math.Abs(destination.Sub(hit.HitInfo.Position).Length())
+		currentRay = currentRay.Reflect(info.Ray) // TODO: this might be wrong
+
+		distFromRFZ := nearestApproach(currentRay, listenPos)
 		isWithinRFZ := distFromRFZ <= params.RFZRadius
 		if isWithinRFZ {
 			return Arrival{
-				LastPos:  hit.HitInfo.Position,
+				LastPos:  info.Position,
 				AllPos:   hitPositions,
 				Gain:     toDB(gain),
-				Distance: distance,
+				Distance: distance + distFromRFZ,
 			}, nil
 		}
 
-		isMaxOrder := i >= params.Order
-		isGainThreshold := gain <= params.GainThreshold
+		isMaxOrder := i >= params.Order-1
+		isGainThreshold := toDB(gain) <= params.GainThreshold
+		// fmt.Printf("Time: %f Thresh: %f\n", distance/SPEED_OF_SOUND*100, params.TimeThreshold*100)
 		isTimeThreshold := distance/SPEED_OF_SOUND > params.TimeThreshold
 		if isMaxOrder || isGainThreshold || isTimeThreshold {
 			return NoHit, nil
 		}
 
-		currentRay = currentRay.Reflect(hit.HitInfo.Ray)
 	}
 	panic("Code bug")
 }
