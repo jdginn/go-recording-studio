@@ -23,14 +23,20 @@ type TraceParams struct {
 
 // Arrival defines a reflection that arrives within the RFZ
 type Arrival struct {
+	// The shot that created this arrival
+	Shot Shot
 	// Position of the last reflection
-	LastPos pt.Vector
+	LastReflection pt.Vector
 	// Slice of positions of all reflections
-	AllPos []pt.Vector
+	AllReflections []pt.Vector
 	// Gain in dB relative to the direct signal
 	Gain float64
 	// Total distance traveled by this ray across all reflections, in meters
 	Distance float64
+	// The nearest this arrival came to the listening position
+	NearestApproachDistance float64
+	// The position of the nearest aproach
+	NearestApproachPosition pt.Vector
 }
 
 const INF = 1e9
@@ -45,6 +51,15 @@ func nearestApproach(ray pt.Ray, point pt.Vector) float64 {
 	return math.Abs(ray.Direction.Dot(diff) - diff.Length())
 }
 
+func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) pt.Vector {
+	dot := center.Sub(ray.Origin).Dot(ray.Direction)
+	dist := dot / ray.Direction.Dot(ray.Direction)
+	return ray.Origin.Add(ray.Direction.MulScalar(dist))
+}
+
+// TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
+//
+// See the Params struct type.
 func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Arrival, error) {
 	mesh, err := r.mesh()
 	if err != nil {
@@ -53,27 +68,30 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 	currentRay := shot.ray
 	gain := 1.0
 	distance := 0.0
-	hitPositions := make([]pt.Vector, 0)
+	hitPositions := []pt.Vector{shot.ray.Origin}
 	for i := 0; i < params.Order; i++ {
-		hit := mesh.Intersect(shot.ray)
+		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
 			return NoHit, fmt.Errorf("Nonterminating ray")
 		}
-		info := hit.Info(shot.ray)
+		info := hit.Info(currentRay)
 		hitPositions = append(hitPositions, info.Position)
 		gain = gain * (1 - info.Material.Reflectivity)
 		distance = distance + hit.T
 
-		currentRay = currentRay.Reflect(info.Ray) // TODO: this might be wrong
+		currentRay = currentRay.Reflect(info.Ray)
 
 		distFromRFZ := nearestApproach(currentRay, listenPos)
 		isWithinRFZ := distFromRFZ <= params.RFZRadius
 		if isWithinRFZ {
 			return Arrival{
-				LastPos:  info.Position,
-				AllPos:   hitPositions,
-				Gain:     toDB(gain),
-				Distance: distance + distFromRFZ,
+				Shot:                    shot,
+				LastReflection:          info.Position,
+				AllReflections:          hitPositions,
+				Gain:                    toDB(gain),
+				Distance:                distance + distFromRFZ,
+				NearestApproachDistance: distFromRFZ,
+				NearestApproachPosition: raySphereIntersection(currentRay, listenPos, params.RFZRadius),
 			}, nil
 		}
 
