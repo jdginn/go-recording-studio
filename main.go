@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
+	"github.com/fogleman/gg"
 	"github.com/fogleman/pt/pt"
 
 	goroom "github.com/jdginn/go-recording-studio/room"
@@ -10,8 +12,10 @@ import (
 
 const MS float64 = 1.0 / 1000.0
 
+const SCALE float64 = 100
+
 func main() {
-	room, err := goroom.NewRoom("testdata/Cutout.3mf")
+	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf")
 	if err != nil {
 		panic(err)
 	}
@@ -40,12 +44,12 @@ func main() {
 
 	arrivals := []goroom.Arrival{}
 
-	for _, shot := range source.Sample(100000, 180, 180) {
+	for _, shot := range source.Sample(3, 180, 180) {
 		arrival, err := room.TraceShot(shot, listenPos, goroom.TraceParams{
 			Order:         10,
 			GainThreshold: -20,
 			TimeThreshold: 1 * MS,
-			RFZRadius:     0.1,
+			RFZRadius:     0.5,
 		})
 		if err != nil {
 			panic(err)
@@ -55,10 +59,30 @@ func main() {
 		}
 	}
 
-	// for _, arrival := range arrivals {
-	// 	if arrival.Distance != goroom.INF {
-	// 		fmt.Printf("Delay: %fms; Gain: %f, Total reflections: %d\n", arrival.Distance/goroom.SPEED_OF_SOUND*1000, arrival.Gain, len(arrival.AllPos))
-	// 	}
-	// }
-	fmt.Printf("%d arrivals", len(arrivals))
+	sort.Slice(arrivals, func(i int, j int) bool {
+		return arrivals[i].Distance < arrivals[j].Distance
+	})
+
+	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(1, 0, 0))
+	p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
+
+	view := goroom.View{
+		C:          gg.NewContext(1000, 1000),
+		TranslateX: 400,
+		TranslateY: 400,
+		Scale:      100,
+		Plane:      p1,
+	}
+
+	scene := goroom.Scene{
+		Sources:           []goroom.Source{source},
+		ListeningPosition: listenPos,
+		Room:              &room,
+	}
+
+	scene.PlotArrivals(arrivals, view)
+	view.Save("out1.png")
+	view.Plane = p2
+	scene.PlotArrivals(arrivals, view)
+	view.Save("out2.png")
 }
