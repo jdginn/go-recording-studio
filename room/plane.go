@@ -57,7 +57,7 @@ func (p Plane) Project(point pt.Vector) pt.Vector {
 	d := point.Sub(p.Point)
 	x := d.Dot(p.U)
 	y := d.Dot(p.V)
-	return pt.Vector{x, y, 0}
+	return V(x, y, 0)
 }
 
 func perpendicular(a pt.Vector) pt.Vector {
@@ -65,9 +65,9 @@ func perpendicular(a pt.Vector) pt.Vector {
 		if a.Z == 0 {
 			return pt.Vector{}
 		}
-		return pt.Vector{0, 1, 0}
+		return V(0, 1, 0)
 	}
-	return pt.Vector{-a.Y, a.X, 0}.Normalize()
+	return V(-a.Y, a.X, 0).Normalize()
 }
 
 type Path []pt.Vector
