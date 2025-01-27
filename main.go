@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/fogleman/gg"
-	"github.com/fogleman/pt/pt"
 
 	goroom "github.com/jdginn/go-recording-studio/room"
 )
@@ -20,32 +18,25 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(room.M.BoundingBox().Max)
-
-	source := goroom.Source{
-		Directivity: goroom.NewDirectivity(map[float64]float64{0: 1}, map[float64]float64{0: 1}),
-		Position: pt.Vector{
-			X: 0.25,
-			Y: 0.25,
-			Z: 0.25,
-		},
-		NormalDirection: pt.Vector{
-			X: 1.0,
-			Y: 0,
-			Z: 0,
-		},
+	listening_triangle := goroom.ListeningTriangle{
+		ReferencePosition: goroom.V(0, 2.0, 0.5),
+		ReferenceNormal:   goroom.V(-1, 0, 0),
+		DistFromFront:     0.5,
+		DistFromCenter:    0.7,
+		SourceHeight:      1.7,
+		ListenHeight:      1.4,
 	}
 
-	listenPos := pt.Vector{
-		X: 2.0,
-		Y: 1.5,
-		Z: 1.7,
+	source := goroom.Source{
+		Directivity:     goroom.NewDirectivity(map[float64]float64{0: 1}, map[float64]float64{0: 1}),
+		Position:        listening_triangle.LeftSourcePosition(),
+		NormalDirection: listening_triangle.LeftSourceNormal(),
 	}
 
 	arrivals := []goroom.Arrival{}
 
-	for _, shot := range source.Sample(3, 180, 180) {
-		arrival, err := room.TraceShot(shot, listenPos, goroom.TraceParams{
+	for _, shot := range source.Sample(100, 180, 180) {
+		arrival, err := room.TraceShot(shot, listening_triangle.ListenPosition(), goroom.TraceParams{
 			Order:         10,
 			GainThreshold: -20,
 			TimeThreshold: 1 * MS,
@@ -64,7 +55,7 @@ func main() {
 	})
 
 	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(1, 0, 0))
-	p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
+	p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0.75), goroom.V(0, 0, 1))
 
 	view := goroom.View{
 		C:          gg.NewContext(1000, 1000),
@@ -76,7 +67,7 @@ func main() {
 
 	scene := goroom.Scene{
 		Sources:           []goroom.Source{source},
-		ListeningPosition: listenPos,
+		ListeningPosition: listening_triangle.ListenPosition(),
 		Room:              &room,
 	}
 
