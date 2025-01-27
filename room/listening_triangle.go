@@ -34,12 +34,20 @@ func (t ListeningTriangle) LeftSourcePosition() pt.Vector {
 	}
 }
 
+func (t ListeningTriangle) LeftSourceNormal() pt.Vector {
+	return t.ListenPosition().Sub(t.LeftSourcePosition()).Normalize()
+}
+
 func (t ListeningTriangle) RightSourcePosition() pt.Vector {
 	return pt.Vector{
 		X: t.ReferencePosition.X + t.DistFromFront,
 		Y: t.ReferencePosition.Y + t.DistFromCenter,
 		Z: t.SourceHeight,
 	}
+}
+
+func (t ListeningTriangle) RightSourceNormal() pt.Vector {
+	return t.ListenPosition().Sub(t.RightSourcePosition()).Normalize()
 }
 
 func (t ListeningTriangle) ListenPosition() pt.Vector {
