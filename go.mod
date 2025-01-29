@@ -8,6 +8,7 @@ require (
 	github.com/hpinc/go3mf v0.24.2
 	github.com/sgreben/piecewiselinear v1.2.0
 	github.com/stretchr/testify v1.10.0
+	gonum.org/v1/gonum v0.15.1
 )
 
 require (

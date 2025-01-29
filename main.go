@@ -28,7 +28,7 @@ func main() {
 	}
 
 	source := goroom.Source{
-		Directivity:     goroom.NewDirectivity(map[float64]float64{0: 1}, map[float64]float64{0: 1}),
+		// D:               goroom.NewDirectivity(map[float64]float64{0: 1}, map[float64]float64{0: 1}),
 		Position:        listening_triangle.LeftSourcePosition(),
 		NormalDirection: listening_triangle.LeftSourceNormal(),
 	}
