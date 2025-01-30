@@ -100,8 +100,8 @@ type Speaker struct {
 	Source
 }
 
-func NewSpeaker(spec LoudSpeakerSpec, pos pt.Vector, dir pt.Vector) *Speaker {
-	return &Speaker{
+func NewSpeaker(spec LoudSpeakerSpec, pos pt.Vector, dir pt.Vector) Speaker {
+	return Speaker{
 		LoudSpeakerSpec: spec,
 		Source: Source{
 			Position:        pos,
