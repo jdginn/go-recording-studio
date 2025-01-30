@@ -18,7 +18,7 @@ func main() {
 		panic(err)
 	}
 
-	listening_triangle := goroom.ListeningTriangle{
+	lt := goroom.ListeningTriangle{
 		ReferencePosition: goroom.V(0, 2.0, 0.5),
 		ReferenceNormal:   goroom.V(-1, 0, 0),
 		DistFromFront:     0.5,
@@ -27,26 +27,36 @@ func main() {
 		ListenHeight:      1.4,
 	}
 
-	source := goroom.Source{
-		// D:               goroom.NewDirectivity(map[float64]float64{0: 1}, map[float64]float64{0: 1}),
-		Position:        listening_triangle.LeftSourcePosition(),
-		NormalDirection: listening_triangle.LeftSourceNormal(),
+	mum8Spec := goroom.LoudSpeakerSpec{
+		Xdim:        0.38,
+		Ydim:        0.256,
+		Zdim:        0.52,
+		Yoff:        0.096,
+		Zoff:        0.412,
+		Directivity: goroom.NewDirectivity(map[float64]float64{0: 0, 30: 0, 60: -12, 70: -100}, map[float64]float64{0: 0, 30: -9, 60: -15, 70: -19, 80: -30}),
+	}
+
+	sources := []goroom.Speaker{
+		goroom.NewSpeaker(mum8Spec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
+		goroom.NewSpeaker(mum8Spec, lt.RightSourcePosition(), lt.RightSourceNormal()),
 	}
 
 	arrivals := []goroom.Arrival{}
 
-	for _, shot := range source.Sample(100, 180, 180) {
-		arrival, err := room.TraceShot(shot, listening_triangle.ListenPosition(), goroom.TraceParams{
-			Order:         10,
-			GainThreshold: -20,
-			TimeThreshold: 1 * MS,
-			RFZRadius:     0.5,
-		})
-		if err != nil {
-			panic(err)
-		}
-		if arrival.Distance != goroom.INF {
-			arrivals = append(arrivals, arrival)
+	for _, source := range sources {
+		for _, shot := range source.Sample(100, 180, 180) {
+			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
+				Order:         10,
+				GainThreshold: -20,
+				TimeThreshold: 30 * MS,
+				RFZRadius:     0.5,
+			})
+			if err != nil {
+				panic(err)
+			}
+			if arrival.Distance != goroom.INF {
+				arrivals = append(arrivals, arrival)
+			}
 		}
 	}
 
@@ -66,8 +76,8 @@ func main() {
 	}
 
 	scene := goroom.Scene{
-		Sources:           []goroom.Source{source},
-		ListeningPosition: listening_triangle.ListenPosition(),
+		Sources:           sources,
+		ListeningPosition: lt.ListenPosition(),
 		Room:              &room,
 	}
 
