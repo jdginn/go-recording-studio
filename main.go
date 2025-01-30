@@ -20,10 +20,10 @@ func main() {
 
 	lt := goroom.ListeningTriangle{
 		ReferencePosition: goroom.V(0, 2.0, 0.5),
-		ReferenceNormal:   goroom.V(-1, 0, 0),
-		DistFromFront:     0.5,
+		ReferenceNormal:   goroom.V(1, 0, 0),
+		DistFromFront:     0.45,
 		DistFromCenter:    0.7,
-		SourceHeight:      1.7,
+		SourceHeight:      1.4,
 		ListenHeight:      1.4,
 	}
 
@@ -42,6 +42,16 @@ func main() {
 	}
 
 	arrivals := []goroom.Arrival{}
+
+	for _, source := range sources {
+		ok, err := source.IsInsideRoom(room.M, lt.ListenPosition())
+		if err != nil {
+			panic(err)
+		}
+		if !ok {
+			panic("Speaker is not inside room!")
+		}
+	}
 
 	for _, source := range sources {
 		for _, shot := range source.Sample(100, 180, 180) {
