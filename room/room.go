@@ -21,7 +21,7 @@ type Room struct {
 }
 
 var WallMaterials = map[string]Material{
-	"default": {0.3},
+	"default": {0.7},
 }
 
 const SCALE = 1000
@@ -47,7 +47,7 @@ func NewFrom3MF(filepath string) (Room, error) {
 		} else {
 			material = WallMaterials["default"]
 		}
-		ptMaterial := pt.Material{Reflectivity: material.Alpha}
+		ptMaterial := pt.Material{Reflectivity: 1 - material.Alpha}
 
 		if obj.Mesh != nil {
 			for _, t := range obj.Mesh.Triangles.Triangle {
