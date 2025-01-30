@@ -1,6 +1,8 @@
 package room
 
 import (
+	"fmt"
+
 	"github.com/fogleman/pt/pt"
 	"github.com/hpinc/go3mf"
 )
@@ -20,13 +22,13 @@ type Room struct {
 	M *pt.Mesh
 }
 
-var WallMaterials = map[string]Material{
-	"default": {0.7},
-}
-
 const SCALE = 1000
 
-func NewFrom3MF(filepath string) (Room, error) {
+func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
+	if _, ok := materials["default"]; !ok {
+		materials["default"] = Material{0.2}
+	}
+
 	var model go3mf.Model
 	r, err := go3mf.OpenReader(filepath)
 	if err != nil {
@@ -39,13 +41,13 @@ func NewFrom3MF(filepath string) (Room, error) {
 	ptTriangles := []*pt.Triangle{}
 	for _, item := range model.Build.Items {
 		obj, _ := model.FindObject(item.ObjectPath(), item.ObjectID)
-		// fmt.Println("object:", *obj)
+		fmt.Println(obj.Name)
 
 		var material Material
-		if _, ok := WallMaterials[obj.Name]; ok {
-			material = WallMaterials[obj.Name]
+		if _, ok := materials[obj.Name]; ok {
+			material = materials[obj.Name]
 		} else {
-			material = WallMaterials["default"]
+			material = materials["default"]
 		}
 		ptMaterial := pt.Material{Reflectivity: 1 - material.Alpha}
 
