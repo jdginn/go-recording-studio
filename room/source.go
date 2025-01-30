@@ -53,13 +53,11 @@ func (d directivity) Gain(horiz, vert float64) float64 {
 }
 
 type Source struct {
-	// TODO: it's awkward that directivity can be set here but usually should come from LoudSpeakerSpec instead
-	Directivity     directivity
 	Position        pt.Vector
 	NormalDirection pt.Vector
 }
 
-func (s *Source) Sample(numSamples int, horizRange, vertRange float64) []Shot {
+func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 	shots := make([]Shot, 0, numSamples)
 
 	var vertSteps, horizSteps int
@@ -89,7 +87,7 @@ func (s *Source) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 
 type LoudSpeakerSpec struct {
 	Xdim, Ydim, Zdim float64
-	Xoff, Yoff       float64
+	Yoff, Zoff       float64
 	Directivity      directivity
 }
 
@@ -106,7 +104,6 @@ func NewSpeaker(spec LoudSpeakerSpec, pos pt.Vector, dir pt.Vector) *Speaker {
 	return &Speaker{
 		LoudSpeakerSpec: spec,
 		Source: Source{
-			Directivity:     spec.Directivity,
 			Position:        pos,
 			NormalDirection: dir,
 		},
@@ -183,16 +180,14 @@ func rotate(point pt.Vector, originalOrientation, newOrientation pt.Vector) pt.V
 	}
 }
 
-func topv(v r3.Vec) pt.Vector {
-	return pt.Vector{X: v.X, Y: v.Y, Z: v.Z}
-}
-
 // vertices returns the vertieces of this speaker
 //
 // creates a box representing the speaker, rotates the box  to the speaker's orientation, translates the speaker to
 // its position in the room, and then returns the vertices
 func (s Speaker) vertices() []pt.Vector {
-	box := r3.NewBox(-s.Xoff, -s.Yoff, 0, s.Xdim-s.Xoff, s.Ydim-s.Yoff, s.Zdim)
+	topv := func(v r3.Vec) pt.Vector { return pt.Vector{X: v.X, Y: v.Y, Z: v.Z} }
+
+	box := r3.NewBox(0, -s.Yoff, -s.Zoff, s.Xdim, s.Ydim-s.Yoff, s.Zdim-s.Zoff)
 
 	defaultDir := V(1, 0, 0)
 	newV := make([]pt.Vector, 0, 8)
