@@ -1,7 +1,6 @@
 package room
 
 import (
-	"fmt"
 	"math"
 
 	"gonum.org/v1/gonum/num/quat"
@@ -112,7 +111,6 @@ func NewSpeaker(spec LoudSpeakerSpec, pos pt.Vector, dir pt.Vector) Speaker {
 
 func normalizeQuat(q quat.Number) quat.Number {
 	norm := math.Sqrt(q.Real*q.Real + q.Imag*q.Imag + q.Jmag*q.Jmag + q.Kmag*q.Kmag)
-	fmt.Printf("norm: %f\n", norm)
 	if norm == 0 {
 		return quat.Number{Real: 1, Imag: 0, Jmag: 0, Kmag: 0}
 	}
@@ -180,6 +178,16 @@ func rotate(point pt.Vector, originalOrientation, newOrientation pt.Vector) pt.V
 	}
 }
 
+func (s Speaker) verticesUnrotated() []pt.Vector {
+	topv := func(v r3.Vec) pt.Vector { return pt.Vector{X: v.X, Y: v.Y, Z: v.Z} }
+	box := r3.NewBox(0, -s.Yoff, -s.Zoff, -s.Xdim, s.Ydim-s.Yoff, s.Zdim-s.Zoff)
+	newV := make([]pt.Vector, 8)
+	for i, v := range box.Vertices() {
+		newV[i] = topv(v)
+	}
+	return newV
+}
+
 // vertices returns the vertieces of this speaker
 //
 // creates a box representing the speaker, rotates the box  to the speaker's orientation, translates the speaker to
@@ -187,18 +195,21 @@ func rotate(point pt.Vector, originalOrientation, newOrientation pt.Vector) pt.V
 func (s Speaker) vertices() []pt.Vector {
 	topv := func(v r3.Vec) pt.Vector { return pt.Vector{X: v.X, Y: v.Y, Z: v.Z} }
 
-	box := r3.NewBox(0, -s.Yoff, -s.Zoff, s.Xdim, s.Ydim-s.Yoff, s.Zdim-s.Zoff)
+	box := r3.NewBox(0, -s.Yoff, -s.Zoff, -s.Xdim, s.Ydim-s.Yoff, s.Zdim-s.Zoff)
 
 	defaultDir := V(1, 0, 0)
-	newV := make([]pt.Vector, 0, 8)
+	newV := make([]pt.Vector, 8)
 	for i, v := range box.Vertices() {
-		newV[i] = rotate(topv(v), defaultDir, s.NormalDirection).Add(s.Position)
+		newPos := topv(v)
+		newPos = rotate(topv(v), defaultDir, s.NormalDirection)
+		newPos = newPos.Add(s.Position)
+		newV[i] = newPos
 	}
 	return newV
 }
 
 // IsInsideRoom returns true if the speaker is inside the innermost set of walls of the mesh
-func (s Speaker) IsInsideRoom(m pt.Mesh, listenPos pt.Vector) (bool, error) {
+func (s Speaker) IsInsideRoom(m *pt.Mesh, listenPos pt.Vector) (bool, error) {
 	for _, v := range s.vertices() {
 		// Check whether a ray from the listening position is obscured by any walls
 		//
@@ -214,8 +225,9 @@ func (s Speaker) IsInsideRoom(m pt.Mesh, listenPos pt.Vector) (bool, error) {
 		// speaker is AT LEAST 50deg, such a convex feature would ruin the room for plenty of other reasons
 		// and should be rejected anyway!
 
-		hit := m.Intersect(pt.Ray{Origin: listenPos, Direction: v.Sub(listenPos)})
-		if hit.T != pt.INF {
+		hit := m.Intersect(pt.Ray{Origin: listenPos, Direction: v.Sub(listenPos).Normalize()})
+		// We'll hit the wall eventually, so we just need to make sure the wall is on the far side of the speaker.
+		if hit.T <= v.Sub(listenPos).Length() {
 			return false, nil
 		}
 	}
