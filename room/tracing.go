@@ -81,6 +81,13 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 
 		currentRay = currentRay.Reflect(info.Ray)
 
+		isMaxOrder := i >= params.Order-1
+		isGainThreshold := toDB(gain) <= params.GainThreshold
+		isTimeThreshold := distance/SPEED_OF_SOUND > params.TimeThreshold
+		if isMaxOrder || isGainThreshold || isTimeThreshold {
+			return NoHit, nil
+		}
+
 		distFromRFZ := nearestApproach(currentRay, listenPos)
 		isWithinRFZ := distFromRFZ <= params.RFZRadius
 		if isWithinRFZ {
@@ -93,13 +100,6 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 				NearestApproachDistance: distFromRFZ,
 				NearestApproachPosition: raySphereIntersection(currentRay, listenPos, params.RFZRadius),
 			}, nil
-		}
-
-		isMaxOrder := i >= params.Order-1
-		isGainThreshold := toDB(gain) <= params.GainThreshold
-		isTimeThreshold := distance/SPEED_OF_SOUND > params.TimeThreshold
-		if isMaxOrder || isGainThreshold || isTimeThreshold {
-			return NoHit, nil
 		}
 
 	}
