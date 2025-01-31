@@ -91,7 +91,7 @@ func main() {
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         10,
 				GainThreshold: -20,
-				TimeThreshold: 30 * MS,
+				TimeThreshold: 100 * MS,
 				RFZRadius:     0.5,
 			})
 			if err != nil {
@@ -124,9 +124,10 @@ func main() {
 		Room:              &room,
 	}
 
-	scene.PlotArrivals(arrivals, view)
+	scene.PlotArrivals3D(arrivals, view)
 	view.Save("out1.png")
 	view.Plane = p2
-	scene.PlotArrivals(arrivals, view)
+	scene.PlotArrivals3D(arrivals, view)
 	view.Save("out2.png")
+	scene.PlotITD(arrivals, 30)
 }
