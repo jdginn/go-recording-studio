@@ -5,6 +5,7 @@ import (
 
 	"github.com/fogleman/gg"
 
+	"github.com/jdginn/go-recording-studio/interact"
 	goroom "github.com/jdginn/go-recording-studio/room"
 )
 
@@ -123,6 +124,8 @@ func main() {
 		ListeningPosition: lt.ListenPosition(),
 		Room:              &room,
 	}
+
+	interact.Interact(scene, view, arrivals, lt.ListenDistance())
 
 	scene.PlotArrivals3D(arrivals, view)
 	view.Save("out1.png")
