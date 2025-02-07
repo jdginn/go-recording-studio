@@ -42,6 +42,7 @@ func (o View) Save(path string) error {
 type Scene struct {
 	Sources           []Speaker
 	ListeningPosition pt.Vector
+	ListeningTriangle ListeningTriangle
 	Room              *Room
 }
 
