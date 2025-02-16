@@ -1,12 +1,16 @@
 package room
 
 import (
-	// "fmt"
 	// "sort"
 
 	"fmt"
+	"image"
+	"image/png"
+	"os"
+	"path"
 
 	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/font"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 
@@ -14,8 +18,12 @@ import (
 	"github.com/fogleman/pt/pt"
 )
 
+type Size struct {
+	X int
+	Y int
+}
+
 type View struct {
-	C          *gg.Context
 	TranslateX float64
 	TranslateY float64
 	Scale      float64
@@ -30,15 +38,6 @@ func (o View) scaleAndTranslate(p Point2D) Point2D {
 	return p.Scale(o.Scale).Translate(o.TranslateX, o.TranslateY)
 }
 
-func (o View) Save(path string) error {
-	err := o.C.SavePNG(path)
-	if err != nil {
-		return err
-	}
-	o.C.Clear()
-	return nil
-}
-
 type Scene struct {
 	Sources           []Speaker
 	ListeningPosition pt.Vector
@@ -46,22 +45,25 @@ type Scene struct {
 	Room              *Room
 }
 
-func (scene Scene) PlotArrivals3D(arrivals []Arrival, view View) {
+func (scene Scene) PlotArrivals3D(X, Y int, arrivals []Arrival, view View) (image.Image, error) {
+	c := gg.NewContext(X, Y)
+
 	listenPos := view.scaleAndTranslate(view.project(scene.ListeningPosition))
-	view.C.DrawCircle(listenPos.X, listenPos.Y, 2)
-	view.C.Fill()
-	view.C.DrawCircle(listenPos.X, listenPos.Y, 50)
+	c.DrawCircle(listenPos.X, listenPos.Y, 2)
+	c.Fill()
+	c.DrawCircle(listenPos.X, listenPos.Y, 50)
 	for _, source := range scene.Sources {
 		sourcePos := view.scaleAndTranslate(view.project(source.Position))
-		view.C.DrawCircle(sourcePos.X, sourcePos.Y, 2)
+		c.DrawCircle(sourcePos.X, sourcePos.Y, 2)
 	}
 
 	for _, lines := range view.Plane.MeshToPath(scene.Room.M) {
 		for i := 0; i < len(lines)-1; i++ {
 			p1 := view.scaleAndTranslate(lines[i])
 			p2 := view.scaleAndTranslate(lines[i+1])
-			view.C.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
-			view.C.Stroke()
+			c.SetLineWidth(10)
+			c.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
+			c.Stroke()
 		}
 	}
 
@@ -73,14 +75,16 @@ func (scene Scene) PlotArrivals3D(arrivals []Arrival, view View) {
 
 		p1 := view.scaleAndTranslate(view.project(arrival.Shot.ray.Origin))
 		for i := 0; i < len(positions); i++ {
+			c.SetLineWidth(arrival.Gain)
 			p2 := view.scaleAndTranslate(view.project(positions[i]))
-			view.C.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
+			c.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
 			p1 = p2
 		}
 		p2 := view.scaleAndTranslate(view.project(arrival.NearestApproachPosition))
-		view.C.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
-		view.C.Stroke()
+		c.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
+		c.Stroke()
 	}
+	return c.Image(), nil
 }
 
 type valuer struct {
@@ -103,7 +107,7 @@ func (v valuer) Value(i int) float64 {
 	return 0
 }
 
-func (scene Scene) PlotITD(arrivals []Arrival, window int) error {
+func (scene Scene) PlotITD(X, Y int, arrivals []Arrival, window int) (image.Image, error) {
 	p := plot.New()
 	p.Title.Text = "ITD"
 	p.X.Label.Text = "Time (ms)"
@@ -120,15 +124,27 @@ func (scene Scene) PlotITD(arrivals []Arrival, window int) error {
 	for _, arrival := range arrivals {
 		delay := arrival.Distance - directDist/SPEED_OF_SOUND*MS
 		v.AddArrival(delay, arrival.Gain)
-		fmt.Printf("%f ms %f dB\n", delay, arrival.Gain)
 	}
+
+	tmpdir, err := os.MkdirTemp("", "goroom")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpdir)
 
 	itd, err := plotter.NewBarChart(v, vg.Points(3))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	p.Add(itd)
-	p.Save(1000, 1000, "itd.png")
-
-	return nil
+	if err := p.Save(font.Length(X), font.Length(Y), path.Join(tmpdir, "itd.png")); err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path.Join(tmpdir, "itd.png"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	fmt.Println("Decoding PNG...")
+	return png.Decode(f)
 }

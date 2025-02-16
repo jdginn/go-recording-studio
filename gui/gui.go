@@ -1,9 +1,8 @@
 package main
 
 import (
-	"image/color"
+	"image"
 	"os"
-	"path"
 	"sort"
 	"sync"
 
@@ -14,18 +13,9 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
-	"github.com/fogleman/gg"
 
 	goroom "github.com/jdginn/go-recording-studio/room"
 )
-
-func mustCwd() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	return cwd
-}
 
 const MS float64 = 1.0 / 1000.0
 
@@ -60,20 +50,39 @@ type GuiContext struct {
 	sync.Mutex
 	w        fyne.Window
 	obj      fyne.CanvasObject
+	tmpdir   string
 	guimode  GUIMODE
 	Filename string
 	Scene    goroom.Scene
 	Arrivals []goroom.Arrival
+	Images   struct {
+		Top  image.Image
+		Side image.Image
+		Itd  image.Image
+	}
 }
 
-func NewGuiContext(w fyne.Window) *GuiContext {
+func NewGuiContext(w fyne.Window) (*GuiContext, func()) {
+	tmpdir, err := os.MkdirTemp("", "goroom")
+	if err != nil {
+		dialog.ShowError(err, w)
+	}
 	c := &GuiContext{
-		w: w,
+		w:      w,
+		tmpdir: tmpdir,
 	}
 	c.update(GUI_MODE_INITIAL)
-	return c
+	return c, func() {
+		os.RemoveAll(c.tmpdir)
+	}
 }
 
+func (c *GuiContext) handleErr(e error) {
+	dialog.ShowError(e, c.w)
+}
+
+// TODO: would be best to have each of these functions return a new object that just embeds GuiContext but enforces the order of operations AND behavior of update()
+// This would encode behavior into the type system rather than an enum.
 func (c *GuiContext) load(filename string) error {
 	c.Filename = filename
 	room, err := goroom.NewFrom3MF(filename, map[string]goroom.Material{
@@ -105,7 +114,6 @@ func (c *GuiContext) load(filename string) error {
 	c.Scene = goroom.Scene{
 		Room: &room,
 	}
-	c.update(GUI_MODE_FILE_LOADED)
 	return nil
 }
 
@@ -150,7 +158,7 @@ func (c *GuiContext) simulate() error {
 			arrival, err := c.Scene.Room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         10,
 				GainThreshold: -20,
-				TimeThreshold: 100 * MS,
+				TimeThreshold: 60 * MS,
 				RFZRadius:     0.5,
 			})
 			if err != nil {
@@ -166,7 +174,6 @@ func (c *GuiContext) simulate() error {
 	c.Scene.ListeningPosition = lt.ListenPosition()
 	c.Scene.Sources = sources
 	c.Arrivals = arrivals
-	c.update(GUI_MODE_SIMULATED)
 	return nil
 }
 
@@ -175,11 +182,10 @@ func (c *GuiContext) drawReflections(arrivals []goroom.Arrival) error {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
-	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
 	p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0.75), goroom.V(0, 0, 1))
+	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
 
 	view := goroom.View{
-		C:          gg.NewContext(1000, 1000),
 		TranslateX: 400,
 		TranslateY: 400,
 		Scale:      100,
@@ -188,25 +194,25 @@ func (c *GuiContext) drawReflections(arrivals []goroom.Arrival) error {
 
 	// interact.Interact(c.Scene, view, arrivals, c.Scene.ListeningTriangle.ListenDistance())
 
-	c.Scene.PlotArrivals3D(arrivals, view)
-	view.Save(path.Join(mustCwd(), "out1.png"))
+	var err error
+	c.Images.Top, err = c.Scene.PlotArrivals3D(400, 400, arrivals, view)
+	if err != nil {
+		return err
+	}
 	view.Plane = p2
-	c.Scene.PlotArrivals3D(arrivals, view)
-	view.Save(path.Join(mustCwd(), "out2.png"))
+	c.Images.Side, err = c.Scene.PlotArrivals3D(400, 400, arrivals, view)
+	if err != nil {
+		return err
+	}
+	c.Images.Itd, err = c.Scene.PlotITD(400, 400, arrivals, 60)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (c *GuiContext) update(mode GUIMODE) {
 	status := widget.NewLabel("goroom recording studio design")
-	drawingFromTop := canvas.NewImageFromFile(path.Join(mustCwd(), "out1.png"))
-	drawingFromTop.FillMode = canvas.ImageFillContain
-	drawingFromTop.Resize(fyne.Size{Width: 400, Height: 300})
-	drawingFromTop.SetMinSize(fyne.Size{Width: 400, Height: 300})
-
-	itd := canvas.NewImageFromFile(path.Join(mustCwd(), "itd.png"))
-	itd.FillMode = canvas.ImageFillContain
-	itd.Resize(fyne.Size{Width: 400, Height: 300})
-	itd.SetMinSize(fyne.Size{Width: 400, Height: 300})
 
 	switch mode {
 	case GUI_MODE_INITIAL:
@@ -215,7 +221,7 @@ func (c *GuiContext) update(mode GUIMODE) {
 			widget.NewButton("Import room model", func() {
 				fd := dialog.NewFileOpen(func(f fyne.URIReadCloser, err error) {
 					if err != nil {
-						dialog.ShowError(err, c.w)
+						c.handleErr(err)
 						return
 					}
 					if f == nil {
@@ -237,6 +243,7 @@ func (c *GuiContext) update(mode GUIMODE) {
 				}
 				fd.SetLocation(luri)
 				fd.Show()
+				c.update(GUI_MODE_FILE_LOADED)
 			}),
 		)
 	case GUI_MODE_FILE_LOADED:
@@ -246,13 +253,20 @@ func (c *GuiContext) update(mode GUIMODE) {
 				if err := c.simulate(); err != nil {
 					dialog.ShowError(err, c.w)
 				}
-				c.drawReflections(c.Arrivals)
-				c.w.Content().Refresh()
+				if err := c.drawReflections(c.Arrivals); err != nil {
+					dialog.ShowError(err, c.w)
+				}
+				c.update(GUI_MODE_SIMULATED)
 			}),
 		)
 	case GUI_MODE_SIMULATED:
+		drawingFromTop := canvas.NewImageFromImage(c.Images.Top)
+		drawingFromTop.FillMode = canvas.ImageFillOriginal
+
+		itd := canvas.NewImageFromImage(c.Images.Itd)
+		itd.FillMode = canvas.ImageFillOriginal
 		c.obj = container.NewVBox(
-			widget.NewList(func() int { return len(c.Arrivals) }, func() fyne.CanvasObject { return canvas.NewCircle(color.Black) }, func(i widget.ListItemID, o fyne.CanvasObject) {}),
+			// widget.NewList(func() int { return len(c.Arrivals) }, func() fyne.CanvasObject { return canvas.NewCircle(color.Black) }, func(i widget.ListItemID, o fyne.CanvasObject) {}),
 			widget.NewLabel("Top view:"),
 			drawingFromTop,
 			widget.NewLabel("ITD graph:"),
@@ -271,7 +285,8 @@ func main() {
 		Height: 600,
 	})
 
-	_ = NewGuiContext(w)
+	_, cleanup := NewGuiContext(w)
+	defer cleanup()
 
 	w.ShowAndRun()
 }
