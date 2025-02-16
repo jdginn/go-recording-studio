@@ -42,12 +42,36 @@ var (
 	GLASS         = goroom.Material{Alpha: 0.0}
 )
 
+type GUIMODE int
+
+const (
+	GUI_MODE_INITIAL GUIMODE = iota
+	GUI_MODE_FILE_LOADED
+	GUI_MODE_SIMULATED
+)
+
+type canvasBuilder struct {
+	hasFilename  bool
+	hasSimulated bool
+}
+
 type GuiContext struct {
 	// TODO: use this
 	sync.Mutex
+	w        fyne.Window
+	obj      fyne.CanvasObject
+	guimode  GUIMODE
 	Filename string
 	Scene    goroom.Scene
 	Arrivals []goroom.Arrival
+}
+
+func NewGuiContext(w fyne.Window) *GuiContext {
+	c := &GuiContext{
+		w: w,
+	}
+	c.update(GUI_MODE_INITIAL)
+	return c
 }
 
 func (c *GuiContext) load(filename string) error {
@@ -81,6 +105,7 @@ func (c *GuiContext) load(filename string) error {
 	c.Scene = goroom.Scene{
 		Room: &room,
 	}
+	c.update(GUI_MODE_FILE_LOADED)
 	return nil
 }
 
@@ -141,7 +166,7 @@ func (c *GuiContext) simulate() error {
 	c.Scene.ListeningPosition = lt.ListenPosition()
 	c.Scene.Sources = sources
 	c.Arrivals = arrivals
-
+	c.update(GUI_MODE_SIMULATED)
 	return nil
 }
 
@@ -168,13 +193,77 @@ func (c *GuiContext) drawReflections(arrivals []goroom.Arrival) error {
 	view.Plane = p2
 	c.Scene.PlotArrivals3D(arrivals, view)
 	view.Save(path.Join(mustCwd(), "out2.png"))
-	// c.Scene.PlotITD(arrivals, 30)
 	return nil
 }
 
-func main() {
-	c := GuiContext{}
+func (c *GuiContext) update(mode GUIMODE) {
+	status := widget.NewLabel("goroom recording studio design")
+	drawingFromTop := canvas.NewImageFromFile(path.Join(mustCwd(), "out1.png"))
+	drawingFromTop.FillMode = canvas.ImageFillContain
+	drawingFromTop.Resize(fyne.Size{Width: 400, Height: 300})
+	drawingFromTop.SetMinSize(fyne.Size{Width: 400, Height: 300})
 
+	itd := canvas.NewImageFromFile(path.Join(mustCwd(), "itd.png"))
+	itd.FillMode = canvas.ImageFillContain
+	itd.Resize(fyne.Size{Width: 400, Height: 300})
+	itd.SetMinSize(fyne.Size{Width: 400, Height: 300})
+
+	switch mode {
+	case GUI_MODE_INITIAL:
+		c.obj = container.NewVBox(
+			status,
+			widget.NewButton("Import room model", func() {
+				fd := dialog.NewFileOpen(func(f fyne.URIReadCloser, err error) {
+					if err != nil {
+						dialog.ShowError(err, c.w)
+						return
+					}
+					if f == nil {
+						return
+					}
+					c.load(f.URI().Path())
+					status.SetText(c.Filename)
+				}, c.w)
+
+				cwd, err := os.Getwd()
+				if err != nil {
+					dialog.ShowError(err, c.w)
+					return
+				}
+				luri, err := storage.ListerForURI(storage.NewFileURI(cwd))
+				if err != nil {
+					dialog.ShowError(err, c.w)
+					return
+				}
+				fd.SetLocation(luri)
+				fd.Show()
+			}),
+		)
+	case GUI_MODE_FILE_LOADED:
+		c.obj = container.NewVBox(
+			status,
+			widget.NewButton("Simulate", func() {
+				if err := c.simulate(); err != nil {
+					dialog.ShowError(err, c.w)
+				}
+				c.drawReflections(c.Arrivals)
+				c.w.Content().Refresh()
+			}),
+		)
+	case GUI_MODE_SIMULATED:
+		c.obj = container.NewVBox(
+			widget.NewList(func() int { return len(c.Arrivals) }, func() fyne.CanvasObject { return canvas.NewCircle(color.Black) }, func(i widget.ListItemID, o fyne.CanvasObject) {}),
+			widget.NewLabel("Top view:"),
+			drawingFromTop,
+			widget.NewLabel("ITD graph:"),
+			itd,
+		)
+	}
+	c.obj.Refresh()
+	c.w.SetContent(c.obj)
+}
+
+func main() {
 	a := app.New()
 	w := a.NewWindow("goroom recording studio design software")
 	w.Resize(fyne.Size{
@@ -182,46 +271,7 @@ func main() {
 		Height: 600,
 	})
 
-	status := widget.NewLabel("goroom recording studio design")
-	var drawingFromTop fyne.CanvasObject = canvas.NewRectangle(color.Gray{})
-	drawingFromTop = canvas.NewImageFromFile(path.Join(mustCwd(), "out1.png"))
-	w.SetContent(container.NewVBox(
-		status,
-		widget.NewButton("Import room model", func() {
-			fd := dialog.NewFileOpen(func(f fyne.URIReadCloser, err error) {
-				if err != nil {
-					dialog.ShowError(err, w)
-					return
-				}
-				if f == nil {
-					return
-				}
-				c.load(f.URI().Path())
-				status.SetText(c.Filename)
-			}, w)
-
-			cwd, err := os.Getwd()
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-			luri, err := storage.ListerForURI(storage.NewFileURI(cwd))
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-			fd.SetLocation(luri)
-			fd.Show()
-		}),
-		drawingFromTop,
-		widget.NewButton("Simulate", func() {
-			if err := c.simulate(); err != nil {
-				dialog.ShowError(err, w)
-			}
-			c.drawReflections(c.Arrivals)
-			w.Content().Refresh()
-		}),
-	))
+	_ = NewGuiContext(w)
 
 	w.ShowAndRun()
 }
