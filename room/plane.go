@@ -1,6 +1,8 @@
 package room
 
 import (
+	"math"
+
 	"github.com/fogleman/pt/pt"
 )
 
@@ -33,12 +35,41 @@ func (p Path2D) Translate(x, y float64) Path2D {
 	return translated
 }
 
-func (p Path2D) Scale(s float64) Path2D {
+func (p Path2D) BoundingBox() (XMin, XMax, YMin, YMax float64) {
+	for _, p := range p {
+		if p.X < XMin {
+			XMin = p.X
+		}
+		if p.X > XMax {
+			XMax = p.X
+		}
+		if p.Y < YMin {
+			YMin = p.Y
+		}
+		if p.Y > YMax {
+			YMax = p.Y
+		}
+	}
+	return
+}
+
+func (p Path2D) rawScale(s float64) Path2D {
 	translated := make(Path2D, len(p))
 	for i, p := range p {
 		translated[i] = p.Scale(s)
 	}
 	return translated
+}
+
+func (p Path2D) Scale(v View) Path2D {
+	XMin, XMax, YMin, YMax := p.BoundingBox()
+	XSize := XMax - XMin
+	YSize := YMax - YMin
+
+	XScale := float64(v.XSize) / XSize
+	YScale := float64(v.YSize) / YSize
+
+	return p.Translate(-XMin, -YMin).rawScale(math.Max(XScale, YScale))
 }
 
 type Plane struct {

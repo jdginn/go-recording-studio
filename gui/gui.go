@@ -177,7 +177,7 @@ func (c *GuiContext) simulate() error {
 	return nil
 }
 
-func (c *GuiContext) drawReflections(arrivals []goroom.Arrival) error {
+func (c *GuiContext) drawReflections(arrivals []goroom.Arrival, XSize, YSize int) error {
 	sort.Slice(arrivals, func(i int, j int) bool {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
@@ -186,21 +186,19 @@ func (c *GuiContext) drawReflections(arrivals []goroom.Arrival) error {
 	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
 
 	view := goroom.View{
-		TranslateX: 400,
-		TranslateY: 400,
-		Scale:      100,
-		Plane:      p1,
+		Scene: c.Scene,
+		XSize: XSize,
+		YSize: YSize,
+		Plane: p1,
 	}
 
-	// interact.Interact(c.Scene, view, arrivals, c.Scene.ListeningTriangle.ListenDistance())
-
 	var err error
-	c.Images.Top, err = c.Scene.PlotArrivals3D(400, 400, arrivals, view)
+	c.Images.Top, err = view.PlotArrivals3D(arrivals)
 	if err != nil {
 		return err
 	}
 	view.Plane = p2
-	c.Images.Side, err = c.Scene.PlotArrivals3D(400, 400, arrivals, view)
+	c.Images.Side, err = view.PlotArrivals3D(arrivals)
 	if err != nil {
 		return err
 	}
@@ -253,7 +251,8 @@ func (c *GuiContext) update(mode GUIMODE) {
 				if err := c.simulate(); err != nil {
 					dialog.ShowError(err, c.w)
 				}
-				if err := c.drawReflections(c.Arrivals); err != nil {
+				// TODO: it would be nice if we weren't hard-coding this value
+				if err := c.drawReflections(c.Arrivals, 400, 400); err != nil {
 					dialog.ShowError(err, c.w)
 				}
 				c.update(GUI_MODE_SIMULATED)
@@ -274,7 +273,7 @@ func (c *GuiContext) update(mode GUIMODE) {
 		)
 	}
 	c.obj.Refresh()
-	c.w.SetContent(c.obj)
+	c.w.SetContent(container.NewVScroll(c.obj))
 }
 
 func main() {

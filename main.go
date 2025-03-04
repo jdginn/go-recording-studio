@@ -1,11 +1,11 @@
 package main
 
 import (
+	"image"
+	"image/png"
+	"os"
 	"sort"
 
-	"github.com/fogleman/gg"
-
-	"github.com/jdginn/go-recording-studio/interact"
 	goroom "github.com/jdginn/go-recording-studio/room"
 )
 
@@ -23,6 +23,15 @@ var (
 	ROCKWOOL_30CM = goroom.Material{Alpha: 0.999}
 	GLASS         = goroom.Material{Alpha: 0.0}
 )
+
+func saveImage(filename string, i image.Image) error {
+	f, err := os.Create("out1.png")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, i)
+}
 
 func main() {
 	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf", map[string]goroom.Material{
@@ -111,26 +120,30 @@ func main() {
 	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
 	p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0.75), goroom.V(0, 0, 1))
 
-	view := goroom.View{
-		C:          gg.NewContext(1000, 1000),
-		TranslateX: 400,
-		TranslateY: 400,
-		Scale:      100,
-		Plane:      p1,
-	}
-
 	scene := goroom.Scene{
 		Sources:           sources,
 		ListeningPosition: lt.ListenPosition(),
 		Room:              &room,
 	}
 
-	interact.Interact(scene, view, arrivals, lt.ListenDistance())
+	view := goroom.View{
+		Scene: scene,
+		XSize: 400,
+		YSize: 400,
+		Plane: p1,
+	}
 
-	scene.PlotArrivals3D(arrivals, view)
-	view.Save("out1.png")
+	img, err := view.PlotArrivals3D(arrivals)
+	if err != nil {
+		panic(err)
+	}
+	if err := saveImage("out1.png", img); err != nil {
+		panic(err)
+	}
 	view.Plane = p2
-	scene.PlotArrivals3D(arrivals, view)
-	view.Save("out2.png")
-	scene.PlotITD(arrivals, 30)
+	img, err = view.PlotArrivals3D(arrivals)
+	if err := saveImage("out2.png", img); err != nil {
+		panic(err)
+	}
+	scene.PlotITD(400, 400, arrivals, 30)
 }
