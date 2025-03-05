@@ -147,7 +147,7 @@ func joinPaths(paths []Path) []Path {
 func (p Plane) SliceMesh(m *pt.Mesh) []Path {
 	var paths []Path
 	for _, t := range m.Triangles {
-		if v1, v2, ok := p.intersectTriangle(t); ok {
+		if v1, v2, ok := p.IntersectTriangle(t); ok {
 			paths = append(paths, Path{v1, v2})
 		}
 	}
@@ -188,7 +188,7 @@ func (p Plane) intersectSegment(v0, v1 pt.Vector) (pt.Vector, bool) {
 	return v0.Add(u.MulScalar(t)), true
 }
 
-func (p Plane) intersectTriangle(t *pt.Triangle) (pt.Vector, pt.Vector, bool) {
+func (p Plane) IntersectTriangle(t *pt.Triangle) (pt.Vector, pt.Vector, bool) {
 	v1, ok1 := p.intersectSegment(t.V1, t.V2)
 	v2, ok2 := p.intersectSegment(t.V2, t.V3)
 	v3, ok3 := p.intersectSegment(t.V3, t.V1)
