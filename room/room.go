@@ -1,8 +1,6 @@
 package room
 
 import (
-	"fmt"
-
 	"github.com/fogleman/pt/pt"
 	"github.com/hpinc/go3mf"
 )
@@ -41,7 +39,6 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 	ptTriangles := []*pt.Triangle{}
 	for _, item := range model.Build.Items {
 		obj, _ := model.FindObject(item.ObjectPath(), item.ObjectID)
-		fmt.Println(obj.Name)
 
 		var material Material
 		if _, ok := materials[obj.Name]; ok {
@@ -88,5 +85,27 @@ func (r *Room) mesh() (*pt.Mesh, error) {
 }
 
 func (r *Room) AddWall(point pt.Vector, normal pt.Vector) error {
+	// Compute intersection of plane with mesh
+	// TODO: for now we assume that the intersection is convex
+	// Build triangles from point to each point on the path of the plane's intersection
+	plane := MakePlane(point, normal)
+
+	newTriangles := []*pt.Triangle{}
+
+	for _, tri := range r.M.Triangles {
+		p1, p2, intersect := plane.IntersectTriangle(tri)
+		if intersect {
+			// TODO: what about intersections with an existing vertex of the room? In that case p1 == p2 and the third vertex of the new triangle must come
+			// from another intersected triangle from the mesh
+			newTriangles = append(newTriangles, &pt.Triangle{
+				V1: plane.Point,
+				V2: p1,
+				V3: p2,
+			})
+		}
+	}
+
+	r.M.Triangles = append(r.M.Triangles, newTriangles...)
+
 	return nil
 }
