@@ -1,6 +1,7 @@
 package room
 
 import (
+	"log"
 	"math"
 
 	"gonum.org/v1/gonum/num/quat"
@@ -11,44 +12,92 @@ import (
 )
 
 type Shot struct {
-	ray  pt.Ray
-	gain float64
+	Ray  pt.Ray
+	Gain float64
 }
 
 type directivity struct {
-	horizFunc, vertFunc lin.Function
+	horizFunc     lin.Function
+	vertFunc      lin.Function
+	maxHorizAngle float64
+	minHorizGain  float64
+	maxVertAngle  float64
+	minVertGain   float64
 }
 
 // Returns a directivity struct, which can compute the gain of a ray shot from a given direction
 //
-// horiz and vert are maps of angle in degrees to gain in dB. Gain should always be negative.
+// horiz and vert are maps of angle in degrees to gain in dB. Gain should always be negative except at 0 degrees.
+// Angles must be positive and in ascending order. The gain at angle θ is equal to the gain at angle -θ.
 func NewDirectivity(horiz, vert map[float64]float64) directivity {
 	d := directivity{}
-	hX := make([]float64, 0, len(horiz))
-	hY := make([]float64, 0, len(horiz))
-	for k, v := range horiz {
-		hX = append(hX, k)
-		hY = append(hY, v)
+
+	// Helper function to validate and process angle-gain maps
+	processMap := func(m map[float64]float64, name string) ([]float64, []float64) {
+		// Ensure 0 degree gain is present
+		if _, exists := m[0]; !exists {
+			m[0] = 0
+		}
+
+		angles := make([]float64, 0, len(m))
+		gains := make([]float64, 0, len(m))
+
+		// Collect and validate angles/gains
+		for angle, gain := range m {
+			if angle < 0 {
+				log.Printf("Warning: ignoring negative angle %.2f in %s directivity map.", angle, name)
+				continue
+			}
+			angles = append(angles, angle)
+			gains = append(gains, gain)
+		}
+
+		return angles, gains
 	}
+
+	// Process horizontal map
+	hX, hY := processMap(horiz, "horizontal")
 	d.horizFunc = lin.Function{
 		X: hX,
 		Y: hY,
 	}
-	vX := make([]float64, 0, len(vert))
-	vY := make([]float64, 0, len(vert))
-	for k, v := range horiz {
-		vX = append(vX, k)
-		vY = append(vY, v)
-	}
+	d.maxHorizAngle = hX[len(hX)-1]
+	d.minHorizGain = hY[len(hY)-1]
+
+	// Process vertical map
+	vX, vY := processMap(vert, "vertical")
 	d.vertFunc = lin.Function{
-		Y: hY,
 		X: vX,
+		Y: vY,
 	}
+	d.maxVertAngle = vX[len(vX)-1]
+	d.minVertGain = vY[len(vY)-1]
+
 	return d
 }
 
-func (d directivity) Gain(horiz, vert float64) float64 {
-	return d.horizFunc.At(horiz) + d.vertFunc.At(vert)
+// GainDB returns the gain in dB for a given horizontal and vertical angle
+func (d *directivity) GainDB(horizAngle, vertAngle float64) float64 {
+	// Take absolute value of angles due to symmetry
+	horizAngle = math.Abs(horizAngle)
+	vertAngle = math.Abs(vertAngle)
+
+	// Clamp angles and get corresponding gains
+	var horizGain, vertGain float64
+	if horizAngle >= d.maxHorizAngle {
+		horizGain = d.minHorizGain
+	} else {
+		horizGain = d.horizFunc.At(horizAngle)
+	}
+
+	if vertAngle >= d.maxVertAngle {
+		vertGain = d.minVertGain
+	} else {
+		vertGain = d.vertFunc.At(vertAngle)
+	}
+
+	// Return the sum of horizontal and vertical gains
+	return horizGain + vertGain
 }
 
 type Source struct {
@@ -70,14 +119,14 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 			pitchRads := pitch / 180 * math.Pi
 
 			shots = append(shots, Shot{
-				ray: pt.Ray{
+				Ray: pt.Ray{
 					Origin: s.Position,
 					Direction: s.NormalDirection.
 						Add(pt.Vector{X: math.Cos(pitchRads), Y: math.Sin(pitchRads), Z: 0}).
 						Add(pt.Vector{X: math.Cos(yawRads), Y: 0, Z: math.Sin(yawRads)}).
 						Normalize(),
 				},
-				gain: s.Directivity.Gain(yaw, pitch),
+				Gain: fromDB(s.Directivity.GainDB(yaw, pitch)),
 			})
 		}
 	}

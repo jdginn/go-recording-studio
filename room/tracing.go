@@ -65,10 +65,10 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 	if err != nil {
 		return Arrival{}, err
 	}
-	currentRay := shot.ray
+	currentRay := shot.Ray
 	gain := 1.0
 	distance := 0.0
-	hitPositions := []pt.Vector{shot.ray.Origin}
+	hitPositions := []pt.Vector{shot.Ray.Origin}
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
@@ -95,7 +95,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
-				Gain:                    toDB(gain),
+				Gain:                    gain,
 				Distance:                distance + distFromRFZ,
 				NearestApproachDistance: distFromRFZ,
 				NearestApproachPosition: raySphereIntersection(currentRay, listenPos, params.RFZRadius),

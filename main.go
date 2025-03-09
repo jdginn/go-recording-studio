@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -35,7 +36,7 @@ func saveImage(filename string, i image.Image) error {
 
 func main() {
 	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf", map[string]goroom.Material{
-		"default":            BRICK,
+		"default":            ROCKWOOL_30CM,
 		"Floor":              WOOD,
 		"Front A":            GYPSUM,
 		"Front B":            GYPSUM,
@@ -76,13 +77,16 @@ func main() {
 		Zdim:        0.52,
 		Yoff:        0.096,
 		Zoff:        0.412,
-		Directivity: goroom.NewDirectivity(map[float64]float64{0: 0, 30: 0, 60: -12, 70: -100}, map[float64]float64{0: 0, 30: -9, 60: -15, 70: -19, 80: -30}),
+		Directivity: goroom.NewDirectivity(map[float64]float64{0: 0, 30: -3, 60: -12, 70: -100}, map[float64]float64{0: 0, 30: -9, 60: -15, 70: -19, 80: -30}),
 	}
 
 	sources := []goroom.Speaker{
 		goroom.NewSpeaker(mum8Spec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
 		goroom.NewSpeaker(mum8Spec, lt.RightSourcePosition(), lt.RightSourceNormal()),
 	}
+
+	room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
+	room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
 
 	arrivals := []goroom.Arrival{}
 
@@ -97,6 +101,10 @@ func main() {
 	}
 
 	for _, source := range sources {
+		shots := source.Sample(100, 180, 180)
+		for _, s := range shots {
+			fmt.Println(s.Gain)
+		}
 		for _, shot := range source.Sample(100, 180, 180) {
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         10,
@@ -117,33 +125,39 @@ func main() {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
-	p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
-	p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0.75), goroom.V(0, 0, 1))
+	// p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
+	// p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0.75), goroom.V(0, 0, 1))
+	//
+	// scene := goroom.Scene{
+	// 	Sources:           sources,
+	// 	ListeningPosition: lt.ListenPosition(),
+	// 	Room:              &room,
+	// }
+	//
+	// view := goroom.View{
+	// 	Scene: scene,
+	// 	XSize: 400,
+	// 	YSize: 400,
+	// 	Plane: p1,
+	// }
+	//
+	// img, err := view.PlotArrivals3D(arrivals)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// if err := saveImage("out1.png", img); err != nil {
+	// 	panic(err)
+	// }
+	// view.Plane = p2
+	// img, err = view.PlotArrivals3D(arrivals)
+	// if err := saveImage("out2.png", img); err != nil {
+	// 	panic(err)
+	// }
+	// scene.PlotITD(400, 400, arrivals, 30)
+	//
+	room.M.SaveSTL("room.stl")
 
-	scene := goroom.Scene{
-		Sources:           sources,
-		ListeningPosition: lt.ListenPosition(),
-		Room:              &room,
-	}
-
-	view := goroom.View{
-		Scene: scene,
-		XSize: 400,
-		YSize: 400,
-		Plane: p1,
-	}
-
-	img, err := view.PlotArrivals3D(arrivals)
-	if err != nil {
+	if err := goroom.SavePointsAndPathsToJSON("annotations.json", nil, arrivals); err != nil {
 		panic(err)
 	}
-	if err := saveImage("out1.png", img); err != nil {
-		panic(err)
-	}
-	view.Plane = p2
-	img, err = view.PlotArrivals3D(arrivals)
-	if err := saveImage("out2.png", img); err != nil {
-		panic(err)
-	}
-	scene.PlotITD(400, 400, arrivals, 30)
 }

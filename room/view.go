@@ -160,7 +160,7 @@ func (view *View) PlotArrivals3D(arrivals []Arrival) (image.Image, error) {
 		}
 		positions := arrival.AllReflections
 
-		p1 := view.translateAndScale(view.project(arrival.Shot.ray.Origin))
+		p1 := view.translateAndScale(view.project(arrival.Shot.Ray.Origin))
 		for i := 0; i < len(positions); i++ {
 			c.SetLineWidth(arrival.Gain)
 			p2 := view.translateAndScale(view.project(positions[i]))
