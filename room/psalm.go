@@ -56,6 +56,16 @@ type AcousticPathJSON struct {
 	Thickness       float64             `json:"thickness,omitempty"`
 }
 
+type ZoneJSON struct {
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	Z            float64 `json:"z"`
+	Radius       float64 `json:"radius"`
+	Name         string  `json:"name,omitempty"`
+	Color        string  `json:"color,omitempty"`
+	Transparency float64 `json:"transparency,omitempty"`
+}
+
 // Conversion functions
 func VectorToJSON(v pt.Vector) PointJSON {
 	return PointJSON{
@@ -95,15 +105,31 @@ func ArrivalToAcousticPathJSON(a Arrival) AcousticPathJSON {
 	}
 }
 
-// SavePointsAndPathsToJSON saves points and both types of paths to a JSON file
-func SavePointsAndPathsToJSON(filename string, points []pt.Vector, arrivals []Arrival) error {
+type Zone struct {
+	Center pt.Vector
+	Radius float64
+}
+
+func ZoneToJSON(z Zone) ZoneJSON {
+	return ZoneJSON{
+		X:      z.Center.X,
+		Y:      z.Center.Y,
+		Z:      z.Center.Z,
+		Radius: z.Radius,
+	}
+}
+
+// SavePointsArrivalsZonesToJSON saves points and both types of paths to a JSON file
+func SavePointsArrivalsZonesToJSON(filename string, points []pt.Vector, arrivals []Arrival, zones []Zone) error {
 	container := struct {
 		Points        []PointJSON        `json:"points,omitempty"`
 		Paths         []PathJSON         `json:"paths,omitempty"`
 		AcousticPaths []AcousticPathJSON `json:"acousticPaths,omitempty"`
+		Zones         []ZoneJSON         `json:"zones, omitment"`
 	}{
-		Points:        make([]PointJSON, len(points)),
+		Points:        make([]PointJSON, 0, len(points)),
 		AcousticPaths: make([]AcousticPathJSON, 0, len(arrivals)),
+		Zones:         make([]ZoneJSON, 0, len(zones)),
 	}
 
 	// Convert points
@@ -116,6 +142,10 @@ func SavePointsAndPathsToJSON(filename string, points []pt.Vector, arrivals []Ar
 		if arrival.Distance != INF {
 			container.AcousticPaths = append(container.AcousticPaths, ArrivalToAcousticPathJSON(arrival))
 		}
+	}
+
+	for _, z := range zones {
+		container.Zones = append(container.Zones, ZoneToJSON(z))
 	}
 
 	data, err := json.MarshalIndent(container, "", "  ")
