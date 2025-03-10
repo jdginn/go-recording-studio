@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -36,7 +35,7 @@ func saveImage(filename string, i image.Image) error {
 
 func main() {
 	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf", map[string]goroom.Material{
-		"default":            ROCKWOOL_30CM,
+		"default":            BRICK,
 		"Floor":              WOOD,
 		"Front A":            GYPSUM,
 		"Front B":            GYPSUM,
@@ -62,6 +61,7 @@ func main() {
 		panic(err)
 	}
 
+	RFZ_RADIUS := 0.5
 	lt := goroom.ListeningTriangle{
 		ReferencePosition: goroom.V(0, 2.0, 0.5),
 		ReferenceNormal:   goroom.V(1, 0, 0),
@@ -85,9 +85,6 @@ func main() {
 		goroom.NewSpeaker(mum8Spec, lt.RightSourcePosition(), lt.RightSourceNormal()),
 	}
 
-	room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
-	room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
-
 	arrivals := []goroom.Arrival{}
 
 	for _, source := range sources {
@@ -100,17 +97,23 @@ func main() {
 		}
 	}
 
+	room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
+	room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
+
+	justWalls := goroom.NewEmptyRoom()
+	justWalls.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
+	justWalls.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
+	justWalls.M.SaveSTL("walls.stl")
+
 	for _, source := range sources {
 		shots := source.Sample(100, 180, 180)
-		for _, s := range shots {
-			fmt.Println(s.Gain)
 		}
-		for _, shot := range source.Sample(100, 180, 180) {
+		for _, shot := range source.Sample(5_000, 180, 180) {
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         10,
-				GainThreshold: -20,
+				GainThreshold: -15,
 				TimeThreshold: 100 * MS,
-				RFZRadius:     0.5,
+				RFZRadius:     RFZ_RADIUS,
 			})
 			if err != nil {
 				panic(err)
@@ -157,7 +160,10 @@ func main() {
 	//
 	room.M.SaveSTL("room.stl")
 
-	if err := goroom.SavePointsAndPathsToJSON("annotations.json", nil, arrivals); err != nil {
+	if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", nil, arrivals, []goroom.Zone{{
+		Center: lt.ListenPosition(),
+		Radius: RFZ_RADIUS,
+	}}); err != nil {
 		panic(err)
 	}
 }

@@ -101,7 +101,6 @@ func ArrivalToAcousticPathJSON(a Arrival) AcousticPathJSON {
 			Position: VectorToJSON(a.NearestApproachPosition),
 			Distance: a.NearestApproachDistance,
 		},
-		Color: "#FF0000", // Default red color for acoustic paths
 	}
 }
 

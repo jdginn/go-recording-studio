@@ -51,11 +51,63 @@ func nearestApproach(ray pt.Ray, point pt.Vector) float64 {
 	return math.Abs(ray.Direction.Dot(diff) - diff.Length())
 }
 
-func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) pt.Vector {
-	dot := center.Sub(ray.Origin).Dot(ray.Direction)
-	dist := dot / ray.Direction.Dot(ray.Direction)
-	return ray.Origin.Add(ray.Direction.MulScalar(dist))
+func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vector, bool) {
+	// Vector from ray origin to sphere center
+	oc := ray.Origin.Sub(center)
+
+	// Quadratic equation coefficients
+	a := ray.Direction.Dot(ray.Direction)
+	b := 2 * oc.Dot(ray.Direction)
+	c := oc.Dot(oc) - radius*radius
+
+	// Calculate discriminant
+	discriminant := b*b - 4*a*c
+
+	// No intersection if discriminant is negative
+	if discriminant < 0 {
+		return pt.Vector{}, false
+	}
+
+	// Calculate the nearest intersection distance
+	t := (-b - math.Sqrt(discriminant)) / (2 * a)
+
+	// If t is negative, the intersection is behind the ray origin
+	if t < 0 {
+		return pt.Vector{}, false
+	}
+
+	// Calculate the intersection point
+	intersectionPoint := ray.Origin.Add(ray.Direction.MulScalar(t))
+	return intersectionPoint, true
 }
+
+// func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vector, bool) {
+// 	oc := ray.Origin.Sub(center)
+// 	a := ray.Direction.Dot(ray.Direction)
+// 	b := 2.0 * oc.Dot(ray.Direction)
+// 	c := oc.Dot(oc) - radius*radius
+// 	discriminant := b*b - 4*a*c
+//
+// 	if discriminant < 0 {
+// 		// No intersection
+// 		return pt.Vector{}, false
+// 	} else {
+// 		// Find the nearest intersection point
+// 		t1 := (-b - math.Sqrt(discriminant)) / (2.0 * a)
+// 		t2 := (-b + math.Sqrt(discriminant)) / (2.0 * a)
+// 		t := t1
+// 		if t1 < 0 {
+// 			t = t2
+// 		}
+// 		if t < 0 {
+// 			// Both intersections behind the ray origin
+// 			fmt.Println("Rand paul")
+// 			return pt.Vector{}, false
+// 		}
+// 		intersectionPoint := ray.Origin.Add(ray.Direction.MulScalar(t))
+// 		return intersectionPoint, true
+// 	}
+// }
 
 // TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
 //
@@ -89,7 +141,8 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 		}
 
 		distFromRFZ := nearestApproach(currentRay, listenPos)
-		isWithinRFZ := distFromRFZ <= params.RFZRadius
+		pos, isWithinRFZ := raySphereIntersection(currentRay, listenPos, params.RFZRadius)
+
 		if isWithinRFZ {
 			return Arrival{
 				Shot:                    shot,
@@ -98,7 +151,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 				Gain:                    gain,
 				Distance:                distance + distFromRFZ,
 				NearestApproachDistance: distFromRFZ,
-				NearestApproachPosition: raySphereIntersection(currentRay, listenPos, params.RFZRadius),
+				NearestApproachPosition: pos,
 			}, nil
 		}
 

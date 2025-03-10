@@ -79,6 +79,12 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 	return room, nil
 }
 
+func NewEmptyRoom() Room {
+	return Room{
+		M: pt.NewMesh([]*pt.Triangle{}),
+	}
+}
+
 func (r *Room) mesh() (*pt.Mesh, error) {
 	return r.M, nil
 	// return pt.Mesh{}, nil
@@ -98,7 +104,7 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector) error {
 			// TODO: what about intersections with an existing vertex of the room? In that case p1 == p2 and the third vertex of the new triangle must come
 			// from another intersected triangle from the mesh
 			newTriangles = append(newTriangles, &pt.Triangle{
-				V1: plane.Point,
+				V1: point,
 				V2: p1,
 				V3: p2,
 			})
@@ -106,6 +112,8 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector) error {
 	}
 
 	r.M.Triangles = append(r.M.Triangles, newTriangles...)
+	// r.M.Add(pt.NewMesh(newTriangles))
+	r.M.Compile()
 
 	return nil
 }
