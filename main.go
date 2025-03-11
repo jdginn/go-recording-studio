@@ -100,14 +100,7 @@ func main() {
 	room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
 	room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
 
-	justWalls := goroom.NewEmptyRoom()
-	justWalls.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
-	justWalls.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
-	justWalls.M.SaveSTL("walls.stl")
-
 	for _, source := range sources {
-		shots := source.Sample(100, 180, 180)
-		}
 		for _, shot := range source.Sample(5_000, 180, 180) {
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         10,
@@ -128,36 +121,6 @@ func main() {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
-	// p1 := goroom.MakePlane(goroom.V(0.25, 0.5, 0), goroom.V(0, 1, 0))
-	// p2 := goroom.MakePlane(goroom.V(0.25, 0.5, 0.75), goroom.V(0, 0, 1))
-	//
-	// scene := goroom.Scene{
-	// 	Sources:           sources,
-	// 	ListeningPosition: lt.ListenPosition(),
-	// 	Room:              &room,
-	// }
-	//
-	// view := goroom.View{
-	// 	Scene: scene,
-	// 	XSize: 400,
-	// 	YSize: 400,
-	// 	Plane: p1,
-	// }
-	//
-	// img, err := view.PlotArrivals3D(arrivals)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// if err := saveImage("out1.png", img); err != nil {
-	// 	panic(err)
-	// }
-	// view.Plane = p2
-	// img, err = view.PlotArrivals3D(arrivals)
-	// if err := saveImage("out2.png", img); err != nil {
-	// 	panic(err)
-	// }
-	// scene.PlotITD(400, 400, arrivals, 30)
-	//
 	room.M.SaveSTL("room.stl")
 
 	if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", nil, arrivals, []goroom.Zone{{
