@@ -94,7 +94,7 @@ func main() {
 			room.M.SaveSTL("room.stl")
 			if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{{
 				Position: v,
-				Size:     10,
+				Color:    goroom.PastelRed,
 				Name:     fmt.Sprint("source_%d", i),
 			}}, nil, nil); err != nil {
 				panic(err)
