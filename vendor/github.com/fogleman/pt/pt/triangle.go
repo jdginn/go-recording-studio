@@ -66,7 +66,19 @@ func (t *Triangle) Intersect(r Ray) Hit {
 	if d < EPS {
 		return NoHit
 	}
-	return Hit{t, d, nil}
+
+	position := r.Position(d)
+	normal := t.NormalAt(position)
+	inside := false
+	if normal.Dot(r.Direction) > 0 {
+		normal = normal.Negate()
+		inside = true
+	}
+	ray := Ray{position, normal}
+	info := HitInfo{t, position, normal, ray, t.MaterialAt(position), inside}
+	return Hit{t, d, &info}
+
+	// return Hit{t, d, nil}
 }
 
 func (t *Triangle) UV(p Vector) Vector {
@@ -106,7 +118,8 @@ func (t *Triangle) NormalAt(p Vector) Vector {
 			T.X, B.X, N.X, 0,
 			T.Y, B.Y, N.Y, 0,
 			T.Z, B.Z, N.Z, 0,
-			0, 0, 0, 1}
+			0, 0, 0, 1,
+		}
 		n = matrix.MulDirection(ns)
 	}
 	if t.Material.BumpTexture != nil {
