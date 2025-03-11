@@ -85,10 +85,9 @@ type ZoneJSON struct {
 // Conversion functions
 func VectorToJSON(v pt.Vector) PointJSON {
 	return PointJSON{
-		X:    v.X,
-		Y:    v.Y,
-		Z:    v.Z,
-		Size: 1.0,
+		X: v.X,
+		Y: v.Y,
+		Z: v.Z,
 	}
 }
 
