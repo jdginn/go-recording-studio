@@ -133,6 +133,27 @@ func ZoneToJSON(z Zone) ZoneJSON {
 	}
 }
 
+// Path represents a sequence of points with optional styling metadata
+type PsalmPath struct {
+	Points    []Point
+	Name      string
+	Color     string
+	Thickness float64
+}
+
+func PathToJSON(path PsalmPath) PathJSON {
+	points := make([]PointJSON, len(path.Points))
+	for i, p := range path.Points {
+		points[i] = PointToJSON(p)
+	}
+	return PathJSON{
+		Points:    points,
+		Name:      path.Name,
+		Color:     path.Color,
+		Thickness: path.Thickness,
+	}
+}
+
 // Point represents a point in 3D space with size and name
 type Point struct {
 	Position pt.Vector
@@ -152,7 +173,7 @@ func PointToJSON(p Point) PointJSON {
 }
 
 // SavePointsArrivalsZonesToJSON saves points and both types of paths to a JSON file
-func SavePointsArrivalsZonesToJSON(filename string, points []Point, arrivals []Arrival, zones []Zone) error {
+func SavePointsArrivalsZonesToJSON(filename string, points []Point, paths []PsalmPath, arrivals []Arrival, zones []Zone) error {
 	container := struct {
 		Points        []PointJSON        `json:"points,omitempty"`
 		Paths         []PathJSON         `json:"paths,omitempty"`
@@ -160,6 +181,7 @@ func SavePointsArrivalsZonesToJSON(filename string, points []Point, arrivals []A
 		Zones         []ZoneJSON         `json:"zones, omitment"`
 	}{
 		Points:        make([]PointJSON, len(points)),
+		Paths:         make([]PathJSON, len(paths)),
 		AcousticPaths: make([]AcousticPathJSON, 0, len(arrivals)),
 		Zones:         make([]ZoneJSON, 0, len(zones)),
 	}
@@ -167,6 +189,10 @@ func SavePointsArrivalsZonesToJSON(filename string, points []Point, arrivals []A
 	// Convert points
 	for i, p := range points {
 		container.Points[i] = PointToJSON(p)
+	}
+
+	for i, p := range paths {
+		container.Paths[i] = PathToJSON(p)
 	}
 
 	// Convert arrivals to acoustic paths
