@@ -36,6 +36,18 @@ func verifyReflectionLaw(incident pt.Ray, normal pt.Vector, reflected pt.Ray) {
 	// if cross.Dot(normal) < coplanarityEpsilon {
 	// 	panic("Vectors should be coplanar")
 	// }
+	//
+	i := incident.Direction.Normalize()
+	n := normal.Normalize()
+	r := reflected.Direction.Normalize()
+
+	// Calculate triple product in a more stable way
+	triple := math.Abs(i.Dot(n.Cross(r)))
+
+	if triple >= coplanarityEpsilon {
+		panic(fmt.Sprintf("Coplanarity check failed!\nTriple product: %v\nIncident: %v\nNormal: %v\nReflected: %v",
+			triple, i, n, r))
+	}
 }
 
 func verifyEnergyConservation(hit pt.HitInfo) bool {
