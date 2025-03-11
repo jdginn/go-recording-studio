@@ -8,6 +8,22 @@ import (
 	"github.com/fogleman/pt/pt"
 )
 
+const (
+	// Pastel Colors
+	PastelRed      = "#FF6961"
+	PastelOrange   = "#FFD1A1"
+	PastelYellow   = "#FDFD96"
+	PastelGreen    = "#77DD77"
+	PastelBlue     = "#AEC6CF"
+	PastelPurple   = "#CBAACB"
+	PastelPink     = "#FFB7CE"
+	PastelTeal     = "#99C5B3"
+	PastelLavender = "#B39EB5"
+	PastelPeach    = "#FFDAC1"
+	PastelMint     = "#B5EAD7"
+	PastelSky      = "#C1E1C1"
+)
+
 // JSON schema types
 type VectorJSON struct {
 	X float64 `json:"x"`
