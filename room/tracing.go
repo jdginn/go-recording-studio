@@ -118,9 +118,10 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 		return Arrival{}, err
 	}
 	currentRay := shot.Ray
-	gain := 1.0
+	gain := shot.Gain
 	distance := 0.0
 	hitPositions := []pt.Vector{shot.Ray.Origin}
+	fmt.Printf("\n\n")
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
@@ -129,28 +130,32 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 		info := hit.Info(currentRay)
 		hitPositions = append(hitPositions, info.Position)
 		gain = gain * (info.Material.Reflectivity)
+		fmt.Printf("Seg dist: %f\n", hit.T)
 		distance = distance + hit.T
 
 		currentRay = currentRay.Reflect(info.Ray)
+		// currentRay = info.Ray
 
-		isMaxOrder := i >= params.Order-1
-		isGainThreshold := toDB(gain) <= params.GainThreshold
-		isTimeThreshold := distance/SPEED_OF_SOUND > params.TimeThreshold
-		if isMaxOrder || isGainThreshold || isTimeThreshold {
+		pastMaxOrder := i >= params.Order-1
+		pastGainThresh := toDB(gain) <= params.GainThreshold
+		pastTimeThresh := distance/SPEED_OF_SOUND > params.TimeThreshold
+		if pastMaxOrder || pastGainThresh || pastTimeThresh {
 			return NoHit, nil
 		}
 
-		distFromRFZ := nearestApproach(currentRay, listenPos)
 		pos, isWithinRFZ := raySphereIntersection(currentRay, listenPos, params.RFZRadius)
 
 		if isWithinRFZ {
+			distToRFZ := pos.Sub(currentRay.Origin).Length()
+			fmt.Printf("Final seg dist: %f\n", distToRFZ)
+			fmt.Printf("Total dist: %f\n", distance+distToRFZ)
 			return Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
 				Gain:                    gain,
-				Distance:                distance + distFromRFZ,
-				NearestApproachDistance: distFromRFZ,
+				Distance:                distance + distToRFZ,
+				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
 			}, nil
 		}
