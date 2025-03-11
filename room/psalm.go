@@ -16,11 +16,11 @@ type VectorJSON struct {
 }
 
 type PointJSON struct {
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
-	Z    float64 `json:"z"`
-	Size float64 `json:"size,omitempty"`
-	Name string  `json:"name,omitempty"`
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Z     float64 `json:"z"`
+	Name  string  `json:"name,omitempty"`
+	Color string  `json:"color,omitempty"`
 }
 
 type RayJSON struct {
@@ -118,22 +118,40 @@ func ZoneToJSON(z Zone) ZoneJSON {
 	}
 }
 
+// Point represents a point in 3D space with size and name
+type Point struct {
+	Position pt.Vector
+	Name     string
+	Color    string
+}
+
+// Conversion functions
+func PointToJSON(p Point) PointJSON {
+	return PointJSON{
+		X:     p.Position.X,
+		Y:     p.Position.Y,
+		Z:     p.Position.Z,
+		Name:  p.Name,
+		Color: p.Color,
+	}
+}
+
 // SavePointsArrivalsZonesToJSON saves points and both types of paths to a JSON file
-func SavePointsArrivalsZonesToJSON(filename string, points []pt.Vector, arrivals []Arrival, zones []Zone) error {
+func SavePointsArrivalsZonesToJSON(filename string, points []Point, arrivals []Arrival, zones []Zone) error {
 	container := struct {
 		Points        []PointJSON        `json:"points,omitempty"`
 		Paths         []PathJSON         `json:"paths,omitempty"`
 		AcousticPaths []AcousticPathJSON `json:"acousticPaths,omitempty"`
 		Zones         []ZoneJSON         `json:"zones, omitment"`
 	}{
-		Points:        make([]PointJSON, 0, len(points)),
+		Points:        make([]PointJSON, len(points)),
 		AcousticPaths: make([]AcousticPathJSON, 0, len(arrivals)),
 		Zones:         make([]ZoneJSON, 0, len(zones)),
 	}
 
 	// Convert points
 	for i, p := range points {
-		container.Points[i] = VectorToJSON(p)
+		container.Points[i] = PointToJSON(p)
 	}
 
 	// Convert arrivals to acoustic paths
