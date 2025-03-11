@@ -39,6 +39,11 @@ type PointJSON struct {
 	Color string  `json:"color,omitempty"`
 }
 
+type ReflectionJSON struct {
+	Position PointJSON  `json:"position"`
+	Normal   VectorJSON `json:"normal"`
+}
+
 type RayJSON struct {
 	Origin    PointJSON  `json:"origin"`
 	Direction VectorJSON `json:"direction"`
@@ -62,7 +67,7 @@ type PathJSON struct {
 }
 
 type AcousticPathJSON struct {
-	Points          []PointJSON         `json:"points"`
+	Reflections     []ReflectionJSON    `json:"reflections"`
 	Shot            ShotJSON            `json:"shot"`
 	Gain            float64             `json:"gain"` // stored in dB
 	Distance        float64             `json:"distance"`
@@ -83,25 +88,42 @@ type ZoneJSON struct {
 }
 
 // Conversion functions
-func VectorToJSON(v pt.Vector) PointJSON {
-	return PointJSON{
+func VectorToJSON(v pt.Vector) VectorJSON {
+	return VectorJSON{
 		X: v.X,
 		Y: v.Y,
 		Z: v.Z,
 	}
 }
 
+func PointToJSON(p Point) PointJSON {
+	return PointJSON{
+		X:     p.Position.X,
+		Y:     p.Position.Y,
+		Z:     p.Position.Z,
+		Name:  p.Name,
+		Color: p.Color,
+	}
+}
+
+func ReflectionToJSON(r Reflection) ReflectionJSON {
+	return ReflectionJSON{
+		Position: PointToJSON(Point{Position: r.Position}),
+		Normal:   VectorToJSON(r.Normal),
+	}
+}
+
 func ArrivalToAcousticPathJSON(a Arrival) AcousticPathJSON {
-	points := make([]PointJSON, len(a.AllReflections))
-	for i, v := range a.AllReflections {
-		points[i] = VectorToJSON(v)
+	reflections := make([]ReflectionJSON, len(a.AllReflections))
+	for i, refl := range a.AllReflections {
+		reflections[i] = ReflectionToJSON(refl)
 	}
 
 	return AcousticPathJSON{
-		Points: points,
+		Reflections: reflections,
 		Shot: ShotJSON{
 			Ray: RayJSON{
-				Origin: VectorToJSON(a.Shot.Ray.Origin),
+				Origin: PointToJSON(Point{Position: a.Shot.Ray.Origin}),
 				Direction: VectorJSON{
 					X: a.Shot.Ray.Direction.X,
 					Y: a.Shot.Ray.Direction.Y,
@@ -113,7 +135,7 @@ func ArrivalToAcousticPathJSON(a Arrival) AcousticPathJSON {
 		Gain:     toDB(a.Gain),
 		Distance: a.Distance,
 		NearestApproach: NearestApproachJSON{
-			Position: VectorToJSON(a.NearestApproachPosition),
+			Position: PointToJSON(Point{Position: a.NearestApproachPosition}),
 			Distance: a.NearestApproachDistance,
 		},
 	}
@@ -161,24 +183,13 @@ type Point struct {
 	Color    string
 }
 
-// Conversion functions
-func PointToJSON(p Point) PointJSON {
-	return PointJSON{
-		X:     p.Position.X,
-		Y:     p.Position.Y,
-		Z:     p.Position.Z,
-		Name:  p.Name,
-		Color: p.Color,
-	}
-}
-
-// SavePointsArrivalsZonesToJSON saves points and both types of paths to a JSON file
+// SavePointsArrivalsZonesToJSON saves points, paths, and both types of paths to a JSON file
 func SavePointsArrivalsZonesToJSON(filename string, points []Point, paths []PsalmPath, arrivals []Arrival, zones []Zone) error {
 	container := struct {
 		Points        []PointJSON        `json:"points,omitempty"`
 		Paths         []PathJSON         `json:"paths,omitempty"`
 		AcousticPaths []AcousticPathJSON `json:"acousticPaths,omitempty"`
-		Zones         []ZoneJSON         `json:"zones, omitment"`
+		Zones         []ZoneJSON         `json:"zones,omitempty"`
 	}{
 		Points:        make([]PointJSON, len(points)),
 		Paths:         make([]PathJSON, len(paths)),
@@ -191,8 +202,9 @@ func SavePointsArrivalsZonesToJSON(filename string, points []Point, paths []Psal
 		container.Points[i] = PointToJSON(p)
 	}
 
-	for i, p := range paths {
-		container.Paths[i] = PathToJSON(p)
+	// Convert paths
+	for i, path := range paths {
+		container.Paths[i] = PathToJSON(path)
 	}
 
 	// Convert arrivals to acoustic paths
@@ -202,6 +214,7 @@ func SavePointsArrivalsZonesToJSON(filename string, points []Point, paths []Psal
 		}
 	}
 
+	// Convert zones
 	for _, z := range zones {
 		container.Zones = append(container.Zones, ZoneToJSON(z))
 	}

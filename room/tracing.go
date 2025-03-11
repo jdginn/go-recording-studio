@@ -21,6 +21,13 @@ type TraceParams struct {
 	RFZRadius float64
 }
 
+type Reflection struct {
+	// Position of the reflection
+	Position pt.Vector
+	// Normal of the surface at the reflection
+	Normal pt.Vector
+}
+
 // Arrival defines a reflection that arrives within the RFZ
 type Arrival struct {
 	// The shot that created this arrival
@@ -28,7 +35,7 @@ type Arrival struct {
 	// Position of the last reflection
 	LastReflection pt.Vector
 	// Slice of positions of all reflections
-	AllReflections []pt.Vector
+	AllReflections []Reflection
 	// Gain in dB relative to the direct signal
 	Gain float64
 	// Total distance traveled by this ray across all reflections, in meters
@@ -92,18 +99,19 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 	currentRay := shot.Ray
 	gain := shot.Gain
 	distance := 0.0
-	hitPositions := []pt.Vector{shot.Ray.Origin}
+	hitPositions := []Reflection{{Position: shot.Ray.Origin, Normal: pt.Vector{}}}
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
 			return NoHit, fmt.Errorf("Nonterminating ray")
 		}
 		info := hit.Info(currentRay)
-		hitPositions = append(hitPositions, info.Position)
+		hitPositions = append(hitPositions, Reflection{Position: info.Position, Normal: info.Normal})
 		gain = gain * (info.Material.Reflectivity)
 		distance = distance + hit.T
 
-		nextRay := currentRay.Reflect(info.Ray)
+		// nextRay := currentRay.Reflect(info.Ray)
+		nextRay := info.Ray
 		verifyReflectionLaw(currentRay, info.Normal, nextRay)
 		currentRay = nextRay
 
