@@ -81,34 +81,6 @@ func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vec
 	return intersectionPoint, true
 }
 
-// func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vector, bool) {
-// 	oc := ray.Origin.Sub(center)
-// 	a := ray.Direction.Dot(ray.Direction)
-// 	b := 2.0 * oc.Dot(ray.Direction)
-// 	c := oc.Dot(oc) - radius*radius
-// 	discriminant := b*b - 4*a*c
-//
-// 	if discriminant < 0 {
-// 		// No intersection
-// 		return pt.Vector{}, false
-// 	} else {
-// 		// Find the nearest intersection point
-// 		t1 := (-b - math.Sqrt(discriminant)) / (2.0 * a)
-// 		t2 := (-b + math.Sqrt(discriminant)) / (2.0 * a)
-// 		t := t1
-// 		if t1 < 0 {
-// 			t = t2
-// 		}
-// 		if t < 0 {
-// 			// Both intersections behind the ray origin
-// 			fmt.Println("Rand paul")
-// 			return pt.Vector{}, false
-// 		}
-// 		intersectionPoint := ray.Origin.Add(ray.Direction.MulScalar(t))
-// 		return intersectionPoint, true
-// 	}
-// }
-
 // TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
 //
 // See the Params struct type.
@@ -131,8 +103,9 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 		gain = gain * (info.Material.Reflectivity)
 		distance = distance + hit.T
 
-		currentRay = currentRay.Reflect(info.Ray)
-		// currentRay = info.Ray
+		nextRay := currentRay.Reflect(info.Ray)
+		verifyReflectionLaw(currentRay, info.Normal, nextRay)
+		currentRay = nextRay
 
 		pastMaxOrder := i >= params.Order-1
 		pastGainThresh := toDB(gain) <= params.GainThreshold
