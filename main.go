@@ -35,7 +35,7 @@ func saveImage(filename string, i image.Image) error {
 }
 
 func main() {
-	room, err := goroom.NewFrom3MF("testdata/Modified.3mf", map[string]goroom.Material{
+	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf", map[string]goroom.Material{
 		"default":            BRICK,
 		"Floor":              WOOD,
 		"Front A":            GYPSUM,
@@ -68,8 +68,9 @@ func main() {
 		ReferenceNormal:   goroom.V(1, 0, 0),
 		DistFromFront:     0.516,
 		DistFromCenter:    1.352,
-		SourceHeight:      1.86,
-		ListenHeight:      1.4,
+		// SourceHeight:      1.86,
+		SourceHeight: 1.7,
+		ListenHeight: 1.4,
 	}
 
 	mum8Spec := goroom.LoudSpeakerSpec{
@@ -89,14 +90,27 @@ func main() {
 	arrivals := []goroom.Arrival{}
 
 	for i, source := range sources {
-		v, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
+		offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
 		if !ok {
 			room.M.SaveSTL("room.stl")
-			if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{{
-				Position: v,
+			p1 := goroom.Point{
+				Position: offendingVertex,
 				Color:    goroom.PastelRed,
 				Name:     fmt.Sprint("source_%d", i),
-			}}, nil, nil); err != nil {
+			}
+			p2 := goroom.Point{
+				Position: intersectingPoint,
+				Color:    goroom.PastelRed,
+				Name:     fmt.Sprint("source_%d_bad_intersection", i),
+			}
+			if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
+				{
+					Points:    []goroom.Point{p1, p2},
+					Name:      "",
+					Color:     goroom.PastelRed,
+					Thickness: 0,
+				},
+			}, nil, nil); err != nil {
 				panic(err)
 			}
 			panic("ERROR: speaker does not fit in room")
@@ -107,7 +121,7 @@ func main() {
 	room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
 
 	for _, source := range sources {
-		for _, shot := range source.Sample(5_000, 180, 180) {
+		for _, shot := range source.Sample(50_000, 180, 180) {
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         10,
 				GainThreshold: -15,
@@ -129,7 +143,7 @@ func main() {
 
 	room.M.SaveSTL("room.stl")
 
-	if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", nil, arrivals, []goroom.Zone{{
+	if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", nil, nil, arrivals, []goroom.Zone{{
 		Center: lt.ListenPosition(),
 		Radius: RFZ_RADIUS,
 	}}); err != nil {
