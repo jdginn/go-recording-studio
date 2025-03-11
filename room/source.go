@@ -258,7 +258,7 @@ func (s Speaker) vertices() []pt.Vector {
 }
 
 // IsInsideRoom returns true if the speaker is inside the innermost set of walls of the mesh
-func (s Speaker) IsInsideRoom(m *pt.Mesh, listenPos pt.Vector) (pt.Vector, bool) {
+func (s Speaker) IsInsideRoom(m *pt.Mesh, listenPos pt.Vector) (offendingVertex pt.Vector, intersectingPoint pt.Vector, ok bool) {
 	for _, v := range s.vertices() {
 		// Check whether a ray from the listening position is obscured by any walls
 		//
@@ -277,8 +277,8 @@ func (s Speaker) IsInsideRoom(m *pt.Mesh, listenPos pt.Vector) (pt.Vector, bool)
 		hit := m.Intersect(pt.Ray{Origin: listenPos, Direction: v.Sub(listenPos).Normalize()})
 		// We'll hit the wall eventually, so we just need to make sure the wall is on the far side of the speaker.
 		if hit.T <= v.Sub(listenPos).Length() {
-			return v, false
+			return v, hit.HitInfo.Position, false
 		}
 	}
-	return pt.Vector{}, true
+	return pt.Vector{}, pt.Vector{}, true
 }
