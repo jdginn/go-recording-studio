@@ -121,7 +121,6 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 	gain := shot.Gain
 	distance := 0.0
 	hitPositions := []pt.Vector{shot.Ray.Origin}
-	fmt.Printf("\n\n")
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
@@ -146,8 +145,6 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 
 		if isWithinRFZ {
 			distToRFZ := pos.Sub(currentRay.Origin).Length()
-			fmt.Printf("Final seg dist: %f\n", distToRFZ)
-			fmt.Printf("Total dist: %f\n", distance+distToRFZ)
 			return Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
