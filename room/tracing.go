@@ -130,7 +130,6 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 		info := hit.Info(currentRay)
 		hitPositions = append(hitPositions, info.Position)
 		gain = gain * (info.Material.Reflectivity)
-		fmt.Printf("Seg dist: %f\n", hit.T)
 		distance = distance + hit.T
 
 		currentRay = currentRay.Reflect(info.Ray)
