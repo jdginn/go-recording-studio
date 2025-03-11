@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -34,7 +35,7 @@ func saveImage(filename string, i image.Image) error {
 }
 
 func main() {
-	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf", map[string]goroom.Material{
+	room, err := goroom.NewFrom3MF("testdata/Modified.3mf", map[string]goroom.Material{
 		"default":            BRICK,
 		"Floor":              WOOD,
 		"Front A":            GYPSUM,
@@ -65,8 +66,8 @@ func main() {
 	lt := goroom.ListeningTriangle{
 		ReferencePosition: goroom.V(0, 2.0, 0.5),
 		ReferenceNormal:   goroom.V(1, 0, 0),
-		DistFromFront:     0.526,
-		DistFromCenter:    1.3,
+		DistFromFront:     0.516,
+		DistFromCenter:    1.352,
 		SourceHeight:      1.86,
 		ListenHeight:      1.4,
 	}
@@ -87,13 +88,18 @@ func main() {
 
 	arrivals := []goroom.Arrival{}
 
-	for _, source := range sources {
-		ok, err := source.IsInsideRoom(room.M, lt.ListenPosition())
-		if err != nil {
-			panic(err)
-		}
+	for i, source := range sources {
+		v, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
 		if !ok {
-			panic("Speaker is not inside room!")
+			room.M.SaveSTL("room.stl")
+			if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{{
+				Position: v,
+				Size:     10,
+				Name:     fmt.Sprint("source_%d", i),
+			}}, nil, nil); err != nil {
+				panic(err)
+			}
+			panic("ERROR: speaker does not fit in room")
 		}
 	}
 
