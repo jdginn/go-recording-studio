@@ -1,6 +1,7 @@
 package room
 
 import (
+	"fmt"
 	"log"
 	"math"
 
@@ -277,6 +278,13 @@ func (s Speaker) IsInsideRoom(m *pt.Mesh, listenPos pt.Vector) (offendingVertex 
 		hit := m.Intersect(pt.Ray{Origin: listenPos, Direction: v.Sub(listenPos).Normalize()})
 		// We'll hit the wall eventually, so we just need to make sure the wall is on the far side of the speaker.
 		if hit.T <= v.Sub(listenPos).Length() {
+			fmt.Printf("v: %v\n", v)
+			fmt.Printf("hit: %v\n", hit)
+			fmt.Printf("hit Ok: %v\n", hit.Ok())
+			fmt.Printf("hitInfo: %v\n", hit.HitInfo)
+			if hit.HitInfo == nil {
+				return v, pt.Vector{}, false
+			}
 			return v, hit.HitInfo.Position, false
 		}
 	}
