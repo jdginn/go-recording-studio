@@ -25,6 +25,16 @@ var (
 	GLASS         = goroom.Material{Alpha: 0.0}
 )
 
+var kh310_directivity = goroom.NewDirectivity(
+	map[float64]float64{0: 0, 30: -0, 40: -1, 50: -2, 60: -3, 70: -4, 80: -6, 90: -7, 100: -8, 120: -11, 150: -20, 160: -50},
+	map[float64]float64{0: 0, 30: -4, 60: -6, 70: -10, 80: -12, 100: -13, 120: -15},
+)
+
+var lp8_directivity = goroom.NewDirectivity(
+	map[float64]float64{0: 0, 30: -1, 40: -3, 50: -3, 60: -4, 70: -6, 80: -9, 90: -12, 120: -11, 150: -20},
+	map[float64]float64{0: 0, 30: 0, 60: -4, 70: -7, 80: -9, 100: -9, 120: -9, 150: -15},
+)
+
 func saveImage(filename string, i image.Image) error {
 	f, err := os.Create("out1.png")
 	if err != nil {
@@ -64,7 +74,7 @@ func main() {
 
 	RFZ_RADIUS := 0.5
 	lt := goroom.ListeningTriangle{
-		ReferencePosition: goroom.V(0, 2.0, 0.5),
+		ReferencePosition: goroom.V(0, 2.37, 0.0),
 		ReferenceNormal:   goroom.V(1, 0, 0),
 		DistFromFront:     0.516,
 		DistFromCenter:    1.352,
@@ -79,7 +89,7 @@ func main() {
 		Zdim:        0.52,
 		Yoff:        0.096,
 		Zoff:        0.412,
-		Directivity: goroom.NewDirectivity(map[float64]float64{0: 0, 30: -3, 60: -12, 70: -100}, map[float64]float64{0: 0, 30: -9, 60: -15, 70: -19, 80: -30}),
+		Directivity: lp8_directivity,
 	}
 
 	sources := []goroom.Speaker{
