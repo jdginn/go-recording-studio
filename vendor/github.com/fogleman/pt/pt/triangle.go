@@ -74,11 +74,14 @@ func (t *Triangle) Intersect(r Ray) Hit {
 		normal = normal.Negate()
 		inside = true
 	}
-	ray := Ray{position, normal}
+
+	// Calculate proper reflection direction
+	dot := r.Direction.Dot(normal)
+	reflectDir := r.Direction.Sub(normal.MulScalar(2 * dot))
+
+	ray := Ray{position, reflectDir}
 	info := HitInfo{t, position, normal, ray, t.MaterialAt(position), inside}
 	return Hit{t, d, &info}
-
-	// return Hit{t, d, nil}
 }
 
 func (t *Triangle) UV(p Vector) Vector {
