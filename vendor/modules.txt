@@ -62,6 +62,9 @@ github.com/BurntSushi/toml/internal
 # github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 ## explicit; go 1.15
 github.com/ajstarks/svgo
+# github.com/alecthomas/kong v1.9.0
+## explicit; go 1.20
+github.com/alecthomas/kong
 # github.com/atotto/clipboard v0.1.4
 ## explicit
 github.com/atotto/clipboard

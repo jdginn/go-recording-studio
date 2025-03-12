@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"log"
 	"os"
 	"sort"
+
+	"github.com/alecthomas/kong"
 
 	goroom "github.com/jdginn/go-recording-studio/room"
 )
@@ -44,32 +47,40 @@ func saveImage(filename string, i image.Image) error {
 	return png.Encode(f, i)
 }
 
-func main() {
-	room, err := goroom.NewFrom3MF("testdata/Cutout.3mf", map[string]goroom.Material{
-		"default":            BRICK,
-		"Floor":              WOOD,
-		"Front A":            GYPSUM,
-		"Front B":            GYPSUM,
-		"Back Diffuser":      DIFFUSER,
-		"Ceiling Diffuser":   ROCKWOOL_24CM,
-		"Street A":           ROCKWOOL_24CM,
-		"Street B":           ROCKWOOL_24CM,
-		"Street C":           ROCKWOOL_24CM,
-		"Street D":           ROCKWOOL_24CM,
-		"Street E":           ROCKWOOL_24CM,
-		"Hall A":             ROCKWOOL_24CM,
-		"Hall B":             ROCKWOOL_24CM,
-		"Hall E":             ROCKWOOL_24CM,
-		"Entry Back":         ROCKWOOL_24CM,
-		"Entry Front":        ROCKWOOL_24CM,
-		"Cutout Top":         ROCKWOOL_24CM,
-		"Window A":           GLASS,
-		"Window B":           GLASS,
-		"left speaker wall":  GYPSUM,
-		"right speaker wall": GYPSUM,
+var CLI struct {
+	Simulate SimulateCmd `cmd:"" help:"Simualte a room"`
+}
+
+type SimulateCmd struct {
+	Mesh                   string `arg:"" name:"mesh" help:"mesh of room to simulate"`
+	SkipSpeakerInRoomCheck bool   `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
+	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
+}
+
+func (c SimulateCmd) Run() error {
+	room, err := goroom.NewFrom3MF(c.Mesh, map[string]goroom.Material{
+		"default":                      BRICK,
+		"Floor":                        WOOD,
+		"Front A":                      GYPSUM,
+		"Front B":                      GYPSUM,
+		"Back Diffuser":                DIFFUSER,
+		"Ceiling Absorber":             ROCKWOOL_24CM,
+		"Secondary Ceiling Absorber L": ROCKWOOL_24CM,
+		"Secondary Ceiling Absorber R": ROCKWOOL_24CM,
+		"Street Absorber":              ROCKWOOL_24CM,
+		"Front Hall Absorber":          ROCKWOOL_24CM,
+		"Back Hall Absorber":           ROCKWOOL_24CM,
+		"Cutout Top":                   ROCKWOOL_24CM,
+		"Door":                         ROCKWOOL_12CM,
+		"L Speaker Gap":                ROCKWOOL_24CM,
+		"R Speaker Gap":                ROCKWOOL_24CM,
+		"Window A":                     GLASS,
+		"Window B":                     GLASS,
+		"left speaker wall":            GYPSUM,
+		"right speaker wall":           GYPSUM,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	RFZ_RADIUS := 0.5
@@ -99,36 +110,40 @@ func main() {
 
 	arrivals := []goroom.Arrival{}
 
-	for i, source := range sources {
-		offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
-		if !ok {
-			room.M.SaveSTL("room.stl")
-			p1 := goroom.Point{
-				Position: offendingVertex,
-				Color:    goroom.PastelRed,
-				Name:     fmt.Sprint("source_%d", i),
+	if !c.SkipSpeakerInRoomCheck {
+		for i, source := range sources {
+			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
+			if !ok {
+				room.M.SaveSTL("room.stl")
+				p1 := goroom.Point{
+					Position: offendingVertex,
+					Color:    goroom.PastelRed,
+					Name:     fmt.Sprint("source_%d", i),
+				}
+				p2 := goroom.Point{
+					Position: intersectingPoint,
+					Color:    goroom.PastelRed,
+					Name:     fmt.Sprint("source_%d_bad_intersection", i),
+				}
+				if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
+					{
+						Points:    []goroom.Point{p1, p2},
+						Name:      "",
+						Color:     goroom.PastelRed,
+						Thickness: 0,
+					},
+				}, nil, nil); err != nil {
+					return err
+				}
+				return fmt.Errorf("ERROR: speaker does not fit in room")
 			}
-			p2 := goroom.Point{
-				Position: intersectingPoint,
-				Color:    goroom.PastelRed,
-				Name:     fmt.Sprint("source_%d_bad_intersection", i),
-			}
-			if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
-				{
-					Points:    []goroom.Point{p1, p2},
-					Name:      "",
-					Color:     goroom.PastelRed,
-					Thickness: 0,
-				},
-			}, nil, nil); err != nil {
-				panic(err)
-			}
-			panic("ERROR: speaker does not fit in room")
 		}
 	}
 
-	room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
-	room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
+	if !c.SkipAddSpeakerWall {
+		room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
+		room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
+	}
 
 	for _, source := range sources {
 		for _, shot := range source.Sample(50_000, 180, 180) {
@@ -157,6 +172,15 @@ func main() {
 		Center: lt.ListenPosition(),
 		Radius: RFZ_RADIUS,
 	}}); err != nil {
-		panic(err)
+		return err
+	}
+	return nil
+}
+
+func main() {
+	ctx := kong.Parse(&CLI)
+	err := ctx.Run()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
