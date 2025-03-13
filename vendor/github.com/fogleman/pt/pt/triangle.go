@@ -1,10 +1,19 @@
 package pt
 
+type TriangleInt interface {
+	Shape
+	T() *Triangle
+}
+
 type Triangle struct {
 	Material   *Material
 	V1, V2, V3 Vector
 	N1, N2, N3 Vector
 	T1, T2, T3 Vector
+}
+
+func (t *Triangle) T() *Triangle {
+	return t
 }
 
 func NewTriangle(v1, v2, v3, t1, t2, t3 Vector, material Material) *Triangle {

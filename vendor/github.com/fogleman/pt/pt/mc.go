@@ -11,21 +11,21 @@ func NewSDFMesh(sdf SDF, box Box, step float64) *Mesh {
 	sx := size.X / float64(nx)
 	sy := size.Y / float64(ny)
 	sz := size.Z / float64(nz)
-	var triangles []*Triangle
+	var triangles []TriangleInt
 	for x := 0; x < nx-1; x++ {
 		for y := 0; y < ny-1; y++ {
 			for z := 0; z < nz-1; z++ {
 				x0, y0, z0 := float64(x)*sx+min.X, float64(y)*sy+min.Y, float64(z)*sz+min.Z
 				x1, y1, z1 := x0+sx, y0+sy, z0+sz
 				p := [8]Vector{
-					Vector{x0, y0, z0},
-					Vector{x1, y0, z0},
-					Vector{x1, y1, z0},
-					Vector{x0, y1, z0},
-					Vector{x0, y0, z1},
-					Vector{x1, y0, z1},
-					Vector{x1, y1, z1},
-					Vector{x0, y1, z1},
+					{x0, y0, z0},
+					{x1, y0, z0},
+					{x1, y1, z0},
+					{x0, y1, z0},
+					{x0, y0, z1},
+					{x1, y0, z1},
+					{x1, y1, z1},
+					{x0, y1, z1},
 				}
 				var v [8]float64
 				for i := 0; i < 8; i++ {
@@ -38,7 +38,7 @@ func NewSDFMesh(sdf SDF, box Box, step float64) *Mesh {
 	return NewMesh(triangles)
 }
 
-func mcPolygonize(p [8]Vector, v [8]float64, x float64) []*Triangle {
+func mcPolygonize(p [8]Vector, v [8]float64, x float64) []TriangleInt {
 	index := 0
 	for i := 0; i < 8; i++ {
 		if v[i] < x {
@@ -59,7 +59,7 @@ func mcPolygonize(p [8]Vector, v [8]float64, x float64) []*Triangle {
 	}
 	table := triangleTable[index]
 	count := len(table) / 3
-	result := make([]*Triangle, count)
+	result := make([]TriangleInt, count)
 	for i := 0; i < count; i++ {
 		triangle := Triangle{}
 		triangle.V3 = points[table[i*3+0]]

@@ -68,7 +68,7 @@ func loadSTLA(file *os.File, material Material) (*Mesh, error) {
 			vertexes = append(vertexes, v)
 		}
 	}
-	var triangles []*Triangle
+	var triangles []TriangleInt
 	for i := 0; i < len(vertexes); i += 3 {
 		t := Triangle{}
 		t.Material = &material
@@ -87,7 +87,7 @@ func loadSTLB(file *os.File, material Material) (*Mesh, error) {
 		return nil, err
 	}
 	count := int(header.Count)
-	triangles := make([]*Triangle, count)
+	triangles := make([]TriangleInt, count)
 	for i := 0; i < count; i++ {
 		d := STLTriangle{}
 		if err := binary.Read(file, binary.LittleEndian, &d); err != nil {
@@ -116,6 +116,7 @@ func SaveSTL(path string, mesh *Mesh) error {
 		return err
 	}
 	for _, triangle := range mesh.Triangles {
+		triangle := triangle.T()
 		n := triangle.Normal()
 		d := STLTriangle{}
 		d.N[0] = float32(n.X)

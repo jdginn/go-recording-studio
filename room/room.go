@@ -9,14 +9,79 @@ type Material struct {
 	Alpha float64
 }
 
-// type Wall struct {
-// 	Name     string
-// 	material Material
-// 	mesh     pt.Mesh
-// }
+type Surface struct {
+	Name     string
+	Material Material
+}
+
+type Triangle struct {
+	pt.Triangle
+	Surface Surface
+}
+
+func (t Triangle) T() *pt.Triangle {
+	return &t.Triangle
+}
+
+func (t *Triangle) Intersect(r pt.Ray) pt.Hit {
+	e1x := t.V2.X - t.V1.X
+	e1y := t.V2.Y - t.V1.Y
+	e1z := t.V2.Z - t.V1.Z
+	e2x := t.V3.X - t.V1.X
+	e2y := t.V3.Y - t.V1.Y
+	e2z := t.V3.Z - t.V1.Z
+	px := r.Direction.Y*e2z - r.Direction.Z*e2y
+	py := r.Direction.Z*e2x - r.Direction.X*e2z
+	pz := r.Direction.X*e2y - r.Direction.Y*e2x
+	det := e1x*px + e1y*py + e1z*pz
+	if det > -pt.EPS && det < pt.EPS {
+		return pt.NoHit
+	}
+	inv := 1 / det
+	tx := r.Origin.X - t.V1.X
+	ty := r.Origin.Y - t.V1.Y
+	tz := r.Origin.Z - t.V1.Z
+	u := (tx*px + ty*py + tz*pz) * inv
+	if u < 0 || u > 1 {
+		return pt.NoHit
+	}
+	qx := ty*e1z - tz*e1y
+	qy := tz*e1x - tx*e1z
+	qz := tx*e1y - ty*e1x
+	v := (r.Direction.X*qx + r.Direction.Y*qy + r.Direction.Z*qz) * inv
+	if v < 0 || u+v > 1 {
+		return pt.NoHit
+	}
+	d := (e2x*qx + e2y*qy + e2z*qz) * inv
+	if d < pt.EPS {
+		return pt.NoHit
+	}
+
+	position := r.Position(d)
+	normal := t.NormalAt(position)
+	inside := false
+	if normal.Dot(r.Direction) > 0 {
+		normal = normal.Negate()
+		inside = true
+	}
+
+	// Calculate proper reflection direction
+	dot := r.Direction.Dot(normal)
+	reflectDir := r.Direction.Sub(normal.MulScalar(2 * dot))
+
+	ray := pt.Ray{position, reflectDir}
+	info := pt.HitInfo{t, position, normal, ray, t.MaterialAt(position), inside}
+	return pt.Hit{t, d, &info}
+}
+
+var _ pt.TriangleInt = (*Triangle)(nil)
+
+type Wall struct {
+	Name     string
+	Material Material
+}
 
 type Room struct {
-	// walls []Wall
 	M *pt.Mesh
 }
 
@@ -36,7 +101,7 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 
 	room := Room{}
 
-	ptTriangles := []*pt.Triangle{}
+	triangles := []pt.TriangleInt{}
 	for _, item := range model.Build.Items {
 		obj, _ := model.FindObject(item.ObjectPath(), item.ObjectID)
 
@@ -46,12 +111,15 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 		} else {
 			material = materials["default"]
 		}
-		ptMaterial := pt.Material{Reflectivity: 1 - material.Alpha}
+
+		surface := Surface{
+			Name:     obj.Name,
+			Material: material,
+		}
 
 		if obj.Mesh != nil {
 			for _, t := range obj.Mesh.Triangles.Triangle {
-				ptTri := &pt.Triangle{}
-				ptTri.Material = &ptMaterial
+				ptTri := pt.Triangle{Material: &pt.Material{}}
 				ptTri.V1 = pt.Vector{
 					X: float64(obj.Mesh.Vertices.Vertex[t.V1].X() / SCALE),
 					Y: float64(obj.Mesh.Vertices.Vertex[t.V1].Y() / SCALE),
@@ -68,20 +136,18 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 					Z: float64(obj.Mesh.Vertices.Vertex[t.V3].Z() / SCALE),
 				}
 				ptTri.FixNormals()
-				ptTriangles = append(ptTriangles, ptTri)
+				triangles = append(triangles, &Triangle{Triangle: ptTri, Surface: surface})
 			}
 		}
-
-		// TODO: link each triangle to the name of its shape in the 3mf file
 	}
-	room.M = pt.NewMesh(ptTriangles)
+	room.M = pt.NewMesh(triangles)
 	room.M.Compile()
 	return room, nil
 }
 
 func NewEmptyRoom() Room {
 	return Room{
-		M: pt.NewMesh([]*pt.Triangle{}),
+		M: pt.NewMesh([]pt.TriangleInt{}),
 	}
 }
 
@@ -96,7 +162,7 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector) error {
 	// Build triangles from point to each point on the path of the plane's intersection
 	plane := MakePlane(point, normal)
 
-	newTriangles := []*pt.Triangle{}
+	newTriangles := []pt.TriangleInt{}
 
 	for _, tri := range r.M.Triangles {
 		p1, p2, intersect := plane.IntersectTriangle(tri)

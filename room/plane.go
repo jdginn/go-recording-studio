@@ -188,10 +188,10 @@ func (p Plane) intersectSegment(v0, v1 pt.Vector) (pt.Vector, bool) {
 	return v0.Add(u.MulScalar(t)), true
 }
 
-func (p Plane) IntersectTriangle(t *pt.Triangle) (pt.Vector, pt.Vector, bool) {
-	v1, ok1 := p.intersectSegment(t.V1, t.V2)
-	v2, ok2 := p.intersectSegment(t.V2, t.V3)
-	v3, ok3 := p.intersectSegment(t.V3, t.V1)
+func (p Plane) IntersectTriangle(t pt.TriangleInt) (pt.Vector, pt.Vector, bool) {
+	v1, ok1 := p.intersectSegment(t.T().V1, t.T().V2)
+	v2, ok2 := p.intersectSegment(t.T().V2, t.T().V3)
+	v3, ok3 := p.intersectSegment(t.T().V3, t.T().V1)
 	var p1, p2 pt.Vector
 	if ok1 && ok2 {
 		p1, p2 = v1, v2
@@ -206,7 +206,7 @@ func (p Plane) IntersectTriangle(t *pt.Triangle) (pt.Vector, pt.Vector, bool) {
 		return pt.Vector{}, pt.Vector{}, false
 	}
 	n := p2.Sub(p1).Cross(p.Normal)
-	if n.Dot(t.Normal()) < 0 {
+	if n.Dot(t.T().Normal()) < 0 {
 		return p1, p2, true
 	} else {
 		return p2, p1, true

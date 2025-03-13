@@ -66,7 +66,7 @@ func TestPlaneIntersection(t *testing.T) {
 	v3 := V(0, 2, 0)
 	v4 := V(0, 0, 2)
 
-	m := pt.NewMesh([]*pt.Triangle{buildTri(v1, v2, v3), buildTri(v2, v3, v4), buildTri(v3, v4, v1), buildTri(v4, v1, v2)})
+	m := pt.NewMesh([]pt.TriangleInt{buildTri(v1, v2, v3), buildTri(v2, v3, v4), buildTri(v3, v4, v1), buildTri(v4, v1, v2)})
 
 	p := MakePlane(
 		V(0, 1, 0),
