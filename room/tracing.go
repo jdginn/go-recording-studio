@@ -26,6 +26,8 @@ type Reflection struct {
 	Position pt.Vector
 	// Normal of the surface at the reflection
 	Normal pt.Vector
+	// Acoustic properties of the surface we reflected off of
+	Surface Surface
 }
 
 // Arrival defines a reflection that arrives within the RFZ
@@ -99,14 +101,17 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 	currentRay := shot.Ray
 	gain := shot.Gain
 	distance := 0.0
-	hitPositions := []Reflection{{Position: shot.Ray.Origin, Normal: pt.Vector{}}}
+	hitPositions := []Reflection{{Position: shot.Ray.Origin}}
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
 			return NoHit, fmt.Errorf("Nonterminating ray")
 		}
 		info := hit.Info(currentRay)
-		hitPositions = append(hitPositions, Reflection{Position: info.Position, Normal: info.Normal})
+		hitPositions = append(hitPositions, Reflection{
+			Position: info.Position, Normal: info.Normal,
+			Surface: *info.Shape.(*Triangle).Surface,
+		})
 		gain = gain * (info.Shape.(*Triangle).Surface.Material.Alpha)
 		distance = distance + hit.T
 

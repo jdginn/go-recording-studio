@@ -16,7 +16,7 @@ type Surface struct {
 
 type Triangle struct {
 	pt.Triangle
-	Surface Surface
+	Surface *Surface
 }
 
 func (t Triangle) T() *pt.Triangle {
@@ -112,7 +112,7 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 			material = materials["default"]
 		}
 
-		surface := Surface{
+		surface := &Surface{
 			Name:     obj.Name,
 			Material: material,
 		}

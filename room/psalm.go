@@ -39,9 +39,32 @@ type PointJSON struct {
 	Color string  `json:"color,omitempty"`
 }
 
+type MaterialJSON struct {
+	Absorption float64 `json:"absorption"`
+}
+
+func MaterialToJSON(m Material) MaterialJSON {
+	return MaterialJSON{
+		Absorption: m.Alpha,
+	}
+}
+
+type SurfaceJSON struct {
+	Material MaterialJSON `json:"material"`
+	Name     string       `json:"name,omitempty"`
+}
+
+func SurfaceToJSON(s Surface) SurfaceJSON {
+	return SurfaceJSON{
+		Material: MaterialToJSON(s.Material),
+		Name:     s.Name,
+	}
+}
+
 type ReflectionJSON struct {
-	Position PointJSON  `json:"position"`
-	Normal   VectorJSON `json:"normal"`
+	Position PointJSON   `json:"position"`
+	Normal   VectorJSON  `json:"normal,omitempty"`
+	Surface  SurfaceJSON `json:"surface,omitempty"`
 }
 
 type RayJSON struct {
@@ -110,6 +133,7 @@ func ReflectionToJSON(r Reflection) ReflectionJSON {
 	return ReflectionJSON{
 		Position: PointToJSON(Point{Position: r.Position}),
 		Normal:   VectorToJSON(r.Normal),
+		Surface:  SurfaceToJSON(r.Surface),
 	}
 }
 
