@@ -112,7 +112,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 			Position: info.Position, Normal: info.Normal,
 			Surface: *info.Shape.(*Triangle).Surface,
 		})
-		gain = gain * (info.Shape.(*Triangle).Surface.Material.Alpha)
+		gain = gain * (1 - info.Shape.(*Triangle).Surface.Material.Alpha)
 		distance = distance + hit.T
 
 		// nextRay := currentRay.Reflect(info.Ray)
