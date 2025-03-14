@@ -61,9 +61,6 @@ func (e *ExperimentDir) GetFilePath(filename string) string {
 
 // CopyConfigFile copies the provided config file to the experiment directory
 func (e *ExperimentDir) CopyConfigFile(srcPath string) error {
-	// Get the original filename
-	filename := filepath.Base(srcPath)
-
 	// Read source file
 	content, err := os.ReadFile(srcPath)
 	if err != nil {
@@ -71,7 +68,7 @@ func (e *ExperimentDir) CopyConfigFile(srcPath string) error {
 	}
 
 	// Write to destination
-	destPath := e.GetFilePath(filename)
+	destPath := e.GetFilePath("config.yaml")
 	if err := os.WriteFile(destPath, content, 0644); err != nil {
 		return fmt.Errorf("writing config file: %w", err)
 	}
