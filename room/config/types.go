@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+
 	room "github.com/jdginn/go-recording-studio/room"
 )
 
@@ -14,6 +16,24 @@ type ExperimentConfig struct {
 	ListeningTriangle  ListeningTriangle  `yaml:"listening_triangle"`
 	Simulation         Simulation         `yaml:"simulation"`
 	Flags              Flags              `yaml:"flags"`
+}
+
+func (c ExperimentConfig) SurfaceAssignmentMap() map[string]room.Material {
+	assignmentMap := make(map[string]room.Material)
+
+	for name, material := range c.SurfaceAssignments.Inline {
+		if _, ok := c.Materials.Inline[material]; !ok {
+			material = "default"
+		}
+		if _, ok := c.Materials.Inline[material]; !ok {
+			panic(fmt.Sprintf("code bug: should be looking up default material but failed to find %s", material))
+		}
+		assignmentMap[name] = room.Material{
+			Alpha: c.Materials.Inline[material].Absorption,
+		}
+	}
+
+	return assignmentMap
 }
 
 type Metadata struct {
@@ -30,16 +50,6 @@ type Input struct {
 type Materials struct {
 	Inline   map[string]Material `yaml:"inline,omitempty"`
 	FromFile string              `yaml:"from_file,omitempty"`
-}
-
-func (m Materials) Map() map[string]room.Material {
-	materialMap := make(map[string]room.Material)
-	for name, material := range m.Inline {
-		materialMap[name] = room.Material{
-			Alpha: material.Absorption,
-		}
-	}
-	return materialMap
 }
 
 type Material struct {

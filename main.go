@@ -72,7 +72,7 @@ func (c SimulateCmd) Run() error {
 		return fmt.Errorf("copying config file: %w", err)
 	}
 
-	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.Materials.Map())
+	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
 	if err != nil {
 		return err
 	}
