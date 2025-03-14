@@ -12,6 +12,7 @@ import (
 
 	goroom "github.com/jdginn/go-recording-studio/room"
 	roomConfig "github.com/jdginn/go-recording-studio/room/config"
+	roomExperiment "github.com/jdginn/go-recording-studio/room/experiment"
 )
 
 const MS float64 = 1.0 / 1000.0
@@ -62,6 +63,15 @@ func (c SimulateCmd) Run() error {
 	if err != nil {
 		return err
 	}
+
+	expDir, err := roomExperiment.CreateExperimentDirectory()
+	if err != nil {
+		return fmt.Errorf("creating experiment directory: %w", err)
+	}
+	if err := expDir.CopyConfigFile(c.Config); err != nil {
+		return fmt.Errorf("copying config file: %w", err)
+	}
+
 	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.Materials.Map())
 	if err != nil {
 		return err
@@ -82,7 +92,7 @@ func (c SimulateCmd) Run() error {
 		for i, source := range sources {
 			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
 			if !ok {
-				room.M.SaveSTL("room.stl")
+				room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 				p1 := goroom.Point{
 					Position: offendingVertex,
 					Color:    goroom.PastelRed,
@@ -134,9 +144,9 @@ func (c SimulateCmd) Run() error {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
-	room.M.SaveSTL("room.stl")
+	room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 
-	if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", nil, nil, arrivals, []goroom.Zone{{
+	if err := goroom.SavePointsArrivalsZonesToJSON(expDir.GetFilePath("annotations.json"), nil, nil, arrivals, []goroom.Zone{{
 		Center: lt.ListenPosition(),
 		Radius: config.Simulation.RFZRadius,
 	}}); err != nil {
