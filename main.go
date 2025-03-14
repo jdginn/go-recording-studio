@@ -62,27 +62,7 @@ func (c SimulateCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, map[string]goroom.Material{
-		"default":                      BRICK,
-		"Floor":                        WOOD,
-		"Front A":                      GYPSUM,
-		"Front B":                      GYPSUM,
-		"Back Diffuser":                DIFFUSER,
-		"Ceiling Absorber":             ROCKWOOL_24CM,
-		"Secondary Ceiling Absorber L": ROCKWOOL_24CM,
-		"Secondary Ceiling Absorber R": ROCKWOOL_24CM,
-		"Street Absorber":              ROCKWOOL_24CM,
-		"Front Hall Absorber":          ROCKWOOL_24CM,
-		"Back Hall Absorber":           ROCKWOOL_24CM,
-		"Cutout Top":                   ROCKWOOL_24CM,
-		"Door":                         ROCKWOOL_12CM,
-		"L Speaker Gap":                ROCKWOOL_24CM,
-		"R Speaker Gap":                ROCKWOOL_24CM,
-		"Window A":                     GLASS,
-		"Window B":                     GLASS,
-		"left speaker wall":            GYPSUM,
-		"right speaker wall":           GYPSUM,
-	})
+	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.Materials.Map())
 	if err != nil {
 		return err
 	}

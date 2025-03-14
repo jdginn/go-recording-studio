@@ -32,6 +32,16 @@ type Materials struct {
 	FromFile string              `yaml:"from_file,omitempty"`
 }
 
+func (m Materials) Map() map[string]room.Material {
+	materialMap := make(map[string]room.Material)
+	for name, material := range m.Inline {
+		materialMap[name] = room.Material{
+			Alpha: material.Absorption,
+		}
+	}
+	return materialMap
+}
+
 type Material struct {
 	Absorption float64 `yaml:"absorption"`
 }
