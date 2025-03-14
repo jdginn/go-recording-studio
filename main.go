@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kong"
 
 	goroom "github.com/jdginn/go-recording-studio/room"
+	roomConfig "github.com/jdginn/go-recording-studio/room/config"
 )
 
 const MS float64 = 1.0 / 1000.0
@@ -28,15 +29,10 @@ var (
 	GLASS         = goroom.Material{Alpha: 0.0}
 )
 
-var kh310_directivity = goroom.NewDirectivity(
-	map[float64]float64{0: 0, 30: -0, 40: -1, 50: -2, 60: -3, 70: -4, 80: -6, 90: -7, 100: -8, 120: -11, 150: -20, 160: -50},
-	map[float64]float64{0: 0, 30: -4, 60: -6, 70: -10, 80: -12, 100: -13, 120: -15},
-)
-
-var lp8_directivity = goroom.NewDirectivity(
-	map[float64]float64{0: 0, 30: -1, 40: -3, 50: -3, 60: -4, 70: -6, 80: -9, 90: -12, 120: -11, 150: -20},
-	map[float64]float64{0: 0, 30: 0, 60: -4, 70: -7, 80: -9, 100: -9, 120: -9, 150: -15},
-)
+// var kh310_directivity = goroom.NewDirectivity(
+// 	map[float64]float64{0: 0, 30: -0, 40: -1, 50: -2, 60: -3, 70: -4, 80: -6, 90: -7, 100: -8, 120: -11, 150: -20, 160: -50},
+// 	map[float64]float64{0: 0, 30: -4, 60: -6, 70: -10, 80: -12, 100: -13, 120: -15},
+// )
 
 func saveImage(filename string, i image.Image) error {
 	f, err := os.Create("out1.png")
@@ -52,13 +48,21 @@ var CLI struct {
 }
 
 type SimulateCmd struct {
-	Mesh                   string `arg:"" name:"mesh" help:"mesh of room to simulate"`
+	Config                 string `arg:"" name:"config" help:"config file to simulate"`
 	SkipSpeakerInRoomCheck bool   `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
 	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
 }
 
 func (c SimulateCmd) Run() error {
-	room, err := goroom.NewFrom3MF(c.Mesh, map[string]goroom.Material{
+	config, err := roomConfig.LoadFromFile(c.Config, roomConfig.LoadOptions{
+		ValidateImmediately: true,
+		ResolvePaths:        true,
+		MergeFiles:          true,
+	})
+	if err != nil {
+		return err
+	}
+	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, map[string]goroom.Material{
 		"default":                      BRICK,
 		"Floor":                        WOOD,
 		"Front A":                      GYPSUM,
@@ -83,29 +87,13 @@ func (c SimulateCmd) Run() error {
 		return err
 	}
 
-	RFZ_RADIUS := 0.5
-	lt := goroom.ListeningTriangle{
-		ReferencePosition: goroom.V(0, 2.37, 0.0),
-		ReferenceNormal:   goroom.V(1, 0, 0),
-		DistFromFront:     0.516,
-		DistFromCenter:    1.352,
-		// SourceHeight:      1.86,
-		SourceHeight: 1.7,
-		ListenHeight: 1.4,
-	}
+	lt := config.ListeningTriangle.Create()
 
-	mum8Spec := goroom.LoudSpeakerSpec{
-		Xdim:        0.38,
-		Ydim:        0.256,
-		Zdim:        0.52,
-		Yoff:        0.096,
-		Zoff:        0.412,
-		Directivity: lp8_directivity,
-	}
+	speakerSpec := config.Speaker.Create()
 
 	sources := []goroom.Speaker{
-		goroom.NewSpeaker(mum8Spec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
-		goroom.NewSpeaker(mum8Spec, lt.RightSourcePosition(), lt.RightSourceNormal()),
+		goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
+		goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal()),
 	}
 
 	arrivals := []goroom.Arrival{}
@@ -146,12 +134,12 @@ func (c SimulateCmd) Run() error {
 	}
 
 	for _, source := range sources {
-		for _, shot := range source.Sample(50_000, 180, 180) {
+		for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
-				Order:         10,
-				GainThreshold: -15,
-				TimeThreshold: 100 * MS,
-				RFZRadius:     RFZ_RADIUS,
+				Order:         config.Simulation.Order,
+				GainThreshold: config.Simulation.GainThresholdDB,
+				TimeThreshold: config.Simulation.TimeThresholdMS * MS,
+				RFZRadius:     config.Simulation.RFZRadius,
 			})
 			if err != nil {
 				panic(err)
@@ -170,7 +158,7 @@ func (c SimulateCmd) Run() error {
 
 	if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", nil, nil, arrivals, []goroom.Zone{{
 		Center: lt.ListenPosition(),
-		Radius: RFZ_RADIUS,
+		Radius: config.Simulation.RFZRadius,
 	}}); err != nil {
 		return err
 	}

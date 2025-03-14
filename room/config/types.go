@@ -1,5 +1,9 @@
 package config
 
+import (
+	room "github.com/jdginn/go-recording-studio/room"
+)
+
 // ExperimentConfig represents the complete configuration for an acoustic room simulation
 type ExperimentConfig struct {
 	Metadata           Metadata           `yaml:"metadata"`
@@ -44,6 +48,17 @@ type Speaker struct {
 	Directivity Directivity       `yaml:"directivity"`
 }
 
+func (s Speaker) Create() room.LoudSpeakerSpec {
+	return room.LoudSpeakerSpec{
+		Xdim:        s.Dimensions.X,
+		Ydim:        s.Dimensions.Y,
+		Zdim:        s.Dimensions.Z,
+		Yoff:        s.Offset.Y,
+		Zoff:        s.Offset.Z,
+		Directivity: room.NewDirectivity(s.Directivity.Horizontal, s.Directivity.Vertical),
+	}
+}
+
 type SpeakerDimensions struct {
 	X float64 `yaml:"x"` // Width in meters
 	Y float64 `yaml:"y"` // Height in meters
@@ -67,6 +82,25 @@ type ListeningTriangle struct {
 	DistanceFromCenter float64    `yaml:"distance_from_center"`
 	SourceHeight       float64    `yaml:"source_height"`
 	ListenHeight       float64    `yaml:"listen_height"`
+}
+
+func (lt ListeningTriangle) Create() room.ListeningTriangle {
+	return room.ListeningTriangle{
+		ReferencePosition: room.V(
+			lt.ReferencePosition[0],
+			lt.ReferencePosition[1],
+			lt.ReferencePosition[2],
+		),
+		ReferenceNormal: room.V(
+			lt.ReferenceNormal[0],
+			lt.ReferenceNormal[1],
+			lt.ReferenceNormal[2],
+		),
+		DistFromFront:  lt.DistanceFromFront,
+		DistFromCenter: lt.DistanceFromCenter,
+		SourceHeight:   lt.SourceHeight,
+		ListenHeight:   lt.ListenHeight,
+	}
 }
 
 type Simulation struct {

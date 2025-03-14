@@ -19,31 +19,31 @@ type LoadOptions struct {
 func LoadFromFile(path string, opts LoadOptions) (*ExperimentConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("reading config file: %w", err)
+		return nil, fmt.Errorf("Error reading config file: %w", err)
 	}
 
 	config := &ExperimentConfig{}
 	if err := yaml.Unmarshal(data, config); err != nil {
-		return nil, fmt.Errorf("parsing config file: %w", err)
+		return nil, fmt.Errorf("Error parsing config file: %w", err)
 	}
 
 	if opts.ResolvePaths {
 		baseDir := filepath.Dir(path)
 		resolver := NewPathResolver(baseDir)
 		if err := config.ResolvePaths(resolver); err != nil {
-			return nil, fmt.Errorf("resolving paths: %w", err)
+			return nil, fmt.Errorf("Error resolving paths: %w", err)
 		}
 	}
 
 	if opts.MergeFiles {
 		if err := config.LoadAndMerge(); err != nil {
-			return nil, fmt.Errorf("merging external files: %w", err)
+			return nil, fmt.Errorf("Error merging external files: %w", err)
 		}
 	}
 
 	if opts.ValidateImmediately {
 		if errs := config.Validate(); len(errs) > 0 {
-			return nil, fmt.Errorf("validation errors: %v", errs)
+			return nil, fmt.Errorf("Error validating config:\n%v", FormatValidationErrors(errs))
 		}
 	}
 

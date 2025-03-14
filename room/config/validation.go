@@ -2,7 +2,61 @@ package config
 
 import (
 	"fmt"
+	"math"
+	"strings"
 )
+
+// Validation helper functions
+func validatePositive(field string, value float64) []ValidationError {
+	if value <= 0 {
+		return []ValidationError{{
+			Field:   field,
+			Message: "must be positive",
+		}}
+	}
+	return nil
+}
+
+func validateNonNegative(field string, value float64) []ValidationError {
+	if value < 0 {
+		return []ValidationError{{
+			Field:   field,
+			Message: "must be non-negative",
+		}}
+	}
+	return nil
+}
+
+func validateInRange(field string, value, min, max float64) []ValidationError {
+	if value < min || value > max {
+		return []ValidationError{{
+			Field:   field,
+			Message: fmt.Sprintf("must be between %v and %v", min, max),
+		}}
+	}
+	return nil
+}
+
+func validateUnitVector(field string, vec [3]float64) []ValidationError {
+	length := math.Sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])
+	if math.Abs(length-1.0) > 1e-6 {
+		return []ValidationError{{
+			Field:   field,
+			Message: "must be a unit vector",
+		}}
+	}
+	return nil
+}
+
+func validateAngleRange(field string, angle float64) []ValidationError {
+	if angle < -180 || angle > 180 {
+		return []ValidationError{{
+			Field:   field,
+			Message: "angle must be between -180 and 180 degrees",
+		}}
+	}
+	return nil
+}
 
 // ValidationError represents a structured validation error
 type ValidationError struct {
@@ -14,11 +68,43 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Field, e.Message)
 }
 
+// New function to format validation errors nicely
+func FormatValidationErrors(errs []ValidationError) string {
+	if len(errs) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("Validation Errors:\n")
+
+	// Group errors by category
+	categories := map[string][]ValidationError{}
+	for _, err := range errs {
+		category := strings.Split(err.Field, ".")[0]
+		categories[category] = append(categories[category], err)
+	}
+
+	// Print errors by category
+	for category, categoryErrors := range categories {
+		b.WriteString(fmt.Sprintf("\n%s:\n", strings.ToUpper(category)))
+		for _, err := range categoryErrors {
+			// Remove category prefix from field for cleaner display
+			field := strings.TrimPrefix(err.Field, category+".")
+			if field == category {
+				field = "general"
+			}
+			b.WriteString(fmt.Sprintf("  - %s: %s\n", field, err.Message))
+		}
+	}
+
+	return b.String()
+}
+
 // Validate performs validation on the entire configuration
 func (c *ExperimentConfig) Validate() []ValidationError {
 	var errors []ValidationError
 	errors = append(errors, c.Materials.Validate()...)
-	errors = append(errors, c.SurfaceAssignments.Validate(c.Materials)...)
+	errors = append(errors, c.SurfaceAssignments.Validate(&c.Materials)...)
 	errors = append(errors, c.Speaker.Validate()...)
 	errors = append(errors, c.ListeningTriangle.Validate()...)
 	errors = append(errors, c.Simulation.Validate()...)
@@ -63,7 +149,7 @@ func (sa *SurfaceAssignments) Validate(materials *Materials) []ValidationError {
 
 	if sa.Inline != nil {
 		// Check for default material
-		defaultMaterial, hasDefault := sa.Inline["default"]
+		_, hasDefault := sa.Inline["default"]
 		if !hasDefault {
 			errors = append(errors, ValidationError{
 				Field:   "surface_assignments.inline",

@@ -1,9 +1,10 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 // MergeMaterials merges materials from a file with inline materials
@@ -15,12 +16,12 @@ func (m *Materials) MergeMaterials() error {
 	// Read and parse the materials file
 	data, err := os.ReadFile(m.FromFile)
 	if err != nil {
-		return fmt.Errorf("reading materials file: %w", err)
+		return fmt.Errorf("reading materials file %s: %w", m.FromFile, err)
 	}
 
 	var fileMaterials map[string]Material
-	if err := json.Unmarshal(data, &fileMaterials); err != nil {
-		return fmt.Errorf("parsing materials file: %w", err)
+	if err := yaml.Unmarshal(data, &fileMaterials); err != nil {
+		return fmt.Errorf("parsing materials file %s: %w", m.FromFile, err)
 	}
 
 	// Initialize inline map if it doesn't exist
@@ -47,12 +48,12 @@ func (sa *SurfaceAssignments) MergeSurfaceAssignments() error {
 	// Read and parse the surface assignments file
 	data, err := os.ReadFile(sa.FromFile)
 	if err != nil {
-		return fmt.Errorf("reading surface assignments file: %w", err)
+		return fmt.Errorf("reading surface assignments file %s: %w", sa.FromFile, err)
 	}
 
 	var fileAssignments map[string]string
-	if err := json.Unmarshal(data, &fileAssignments); err != nil {
-		return fmt.Errorf("parsing surface assignments file: %w", err)
+	if err := yaml.Unmarshal(data, &fileAssignments); err != nil {
+		return fmt.Errorf("parsing surface assignments file %s: %w", sa.FromFile, err)
 	}
 
 	// Initialize inline map if it doesn't exist
