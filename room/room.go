@@ -156,7 +156,13 @@ func (r *Room) mesh() (*pt.Mesh, error) {
 	// return pt.Mesh{}, nil
 }
 
-func (r *Room) AddWall(point pt.Vector, normal pt.Vector) error {
+func (r *Room) AddWall(point pt.Vector, normal pt.Vector, name string, material Material) error {
+
+	surface := Surface{
+		Name:     name,
+		Material: material,
+	}
+
 	// Compute intersection of plane with mesh
 	// TODO: for now we assume that the intersection is convex
 	// Build triangles from point to each point on the path of the plane's intersection
@@ -169,10 +175,13 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector) error {
 		if intersect {
 			// TODO: what about intersections with an existing vertex of the room? In that case p1 == p2 and the third vertex of the new triangle must come
 			// from another intersected triangle from the mesh
-			newTriangles = append(newTriangles, &pt.Triangle{
-				V1: point,
-				V2: p1,
-				V3: p2,
+			newTriangles = append(newTriangles, &Triangle{
+				Triangle: pt.Triangle{
+					V1: point,
+					V2: p1,
+					V3: p2,
+				},
+				Surface: &surface,
 			})
 		}
 	}

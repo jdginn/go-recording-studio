@@ -36,6 +36,14 @@ func (c ExperimentConfig) SurfaceAssignmentMap() map[string]room.Material {
 	return assignmentMap
 }
 
+func (c ExperimentConfig) GetSurfaceAssignment(name string) room.Material {
+	mat, ok := c.Materials.Inline[name]
+	if !ok {
+		mat = c.Materials.Inline["default"]
+	}
+	return room.Material{Alpha: mat.Absorption}
+}
+
 type Metadata struct {
 	Timestamp string `yaml:"timestamp"` // YYYY-MM-DD HH:MM:SS in UTC
 	GitCommit string `yaml:"git_commit"`

@@ -121,8 +121,8 @@ func (c SimulateCmd) Run() error {
 	}
 
 	if !c.SkipAddSpeakerWall {
-		room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal())
-		room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal())
+		room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal(), "Left Speaker Wall", config.GetSurfaceAssignment("Left Speaker Wall"))
+		room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal(), "Right Speaker Wall", config.GetSurfaceAssignment("Right Speaker Wall"))
 	}
 
 	for _, source := range sources {
