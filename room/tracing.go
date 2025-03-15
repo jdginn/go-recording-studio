@@ -64,7 +64,7 @@ func nearestApproach(ray pt.Ray, point pt.Vector) float64 {
 	return math.Abs(ray.Direction.Dot(diff) - diff.Length())
 }
 
-func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vector, bool) {
+func rayHemisphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vector, bool) {
 	// Vector from ray origin to sphere center
 	oc := ray.Origin.Sub(center)
 
@@ -91,6 +91,14 @@ func raySphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt.Vec
 
 	// Calculate the intersection point
 	intersectionPoint := ray.Origin.Add(ray.Direction.MulScalar(t))
+
+	if intersectionPoint.Z < center.Z {
+		return pt.Vector{}, false
+	}
+	if intersectionPoint.X < center.X {
+		return pt.Vector{}, false
+	}
+
 	return intersectionPoint, true
 }
 
@@ -131,7 +139,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 			return NoHit, nil
 		}
 
-		pos, isWithinRFZ := raySphereIntersection(currentRay, listenPos, params.RFZRadius)
+		pos, isWithinRFZ := rayHemisphereIntersection(currentRay, listenPos, params.RFZRadius)
 
 		if isWithinRFZ {
 			distToRFZ := pos.Sub(currentRay.Origin).Length()
