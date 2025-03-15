@@ -48,6 +48,10 @@ type Arrival struct {
 	NearestApproachPosition pt.Vector
 }
 
+func (a Arrival) ITD() float64 {
+	return (a.Distance - a.Shot.Ray.Origin.Sub(a.LastReflection).Length()) / SPEED_OF_SOUND * 1000
+}
+
 const INF = 1e9
 
 var NoHit = Arrival{Gain: 0.0, Distance: INF}
