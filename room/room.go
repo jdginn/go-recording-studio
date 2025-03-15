@@ -163,9 +163,6 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector, name string, material 
 		Material: material,
 	}
 
-	// Compute intersection of plane with mesh
-	// TODO: for now we assume that the intersection is convex
-	// Build triangles from point to each point on the path of the plane's intersection
 	plane := MakePlane(point, normal)
 
 	newTriangles := []pt.TriangleInt{}
@@ -187,7 +184,28 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector, name string, material 
 	}
 
 	r.M.Triangles = append(r.M.Triangles, newTriangles...)
-	// r.M.Add(pt.NewMesh(newTriangles))
+	r.M.Compile()
+
+	return nil
+}
+
+type Bounds struct {
+	Min, Max float64
+}
+
+func (r *Room) AddPrism(XBound, YBound, ZBound Bounds, name string, material Material) error {
+	cube := pt.NewCube(
+		pt.Vector{X: XBound.Min, Y: YBound.Min, Z: ZBound.Min},
+		pt.Vector{X: XBound.Max, Y: YBound.Max, Z: ZBound.Max},
+		pt.Material{})
+
+	for _, tri := range cube.Mesh().Triangles {
+		r.M.Triangles = append(r.M.Triangles, &Triangle{
+			Triangle: *tri.T(),
+			Surface:  &Surface{Name: name, Material: material},
+		})
+	}
+
 	r.M.Compile()
 
 	return nil
