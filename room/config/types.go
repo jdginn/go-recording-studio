@@ -16,6 +16,7 @@ type ExperimentConfig struct {
 	ListeningTriangle  ListeningTriangle  `yaml:"listening_triangle"`
 	Simulation         Simulation         `yaml:"simulation"`
 	Flags              Flags              `yaml:"flags"`
+	CeilingPanels      CeilingPanels      `yaml:"ceiling_panels"`
 }
 
 func (c ExperimentConfig) SurfaceAssignmentMap() map[string]room.Material {
@@ -143,4 +144,22 @@ type Simulation struct {
 type Flags struct {
 	SkipSpeakerInRoomCheck bool `yaml:"skip_speaker_in_room_check"`
 	SkipAddSpeakerWall     bool `yaml:"skip_add_speaker_wall"`
+}
+
+type CeilingPanels struct {
+	Center *struct {
+		Thickness float64 `yaml:"thickness"`
+		Height    float64 `yaml:"height"`
+		Width     float64 `yaml:"width"`
+		XMin      float64 `yaml:"xmin"`
+		XMax      float64 `yaml:"xmax"`
+	} `yaml:"center,omitempty"`
+	Sides *struct {
+		Thickness float64 `yaml:"thickness"`
+		Height    float64 `yaml:"height"`
+		Width     float64 `yaml:"width"`
+		Spacing   float64 `yaml:"spacing"`
+		XMin      float64 `yaml:"xmin"`
+		XMax      float64 `yaml:"xmax"`
+	} `yaml:"sides,omitempty"`
 }

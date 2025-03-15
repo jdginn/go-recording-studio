@@ -236,3 +236,22 @@ func (i *Input) Validate() []ValidationError {
 
 	return errors
 }
+
+func (c *CeilingPanels) Validate() []ValidationError {
+	var errors []ValidationError
+
+	errors = append(errors, validatePositive("ceiling_panels.center.height", c.Center.Height)...)
+	errors = append(errors, validatePositive("ceiling_panels.center.thickness", c.Center.Thickness)...)
+	errors = append(errors, validatePositive("ceiling_panels.center.width", c.Center.Width)...)
+	errors = append(errors, validatePositive("ceiling_panels.center.xmin", c.Center.XMin)...)
+	errors = append(errors, validatePositive("ceiling_panels.center.xmax", c.Center.XMax)...)
+
+	errors = append(errors, validatePositive("ceiling_panels.sides.height", c.Sides.Height)...)
+	errors = append(errors, validatePositive("ceiling_panels.sides.thickness", c.Sides.Thickness)...)
+	errors = append(errors, validatePositive("ceiling_panels.sides.width", c.Sides.Width)...)
+	errors = append(errors, validatePositive("ceiling_panels.sides.spacing", c.Sides.Spacing)...)
+	errors = append(errors, validatePositive("ceiling_panels.sides.xmin", c.Sides.XMin)...)
+	errors = append(errors, validatePositive("ceiling_panels.sides.xmax", c.Sides.XMax)...)
+
+	return errors
+}
