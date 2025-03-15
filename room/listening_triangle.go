@@ -52,7 +52,7 @@ func (t ListeningTriangle) RightSourceNormal() pt.Vector {
 
 func (t ListeningTriangle) ListenPosition() pt.Vector {
 	return pt.Vector{
-		X: t.ReferencePosition.X + t.DistFromFront + (t.DistFromCenter / 2 * math.Sqrt(3)) + LISTEN_DIST_INTO_TRIANGLE,
+		X: t.ReferencePosition.X + t.DistFromFront + (t.DistFromCenter / 2 * math.Sqrt(3)) - LISTEN_DIST_INTO_TRIANGLE,
 		Y: t.ReferencePosition.Y,
 		Z: t.ListenHeight,
 	}
