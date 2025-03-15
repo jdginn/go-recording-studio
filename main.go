@@ -79,6 +79,8 @@ func (c SimulateCmd) Run() error {
 
 	lt := config.ListeningTriangle.Create()
 
+	fmt.Printf("Listening position is %fm from front wall.\n\n", lt.ListenPosition().X)
+
 	speakerSpec := config.Speaker.Create()
 
 	sources := []goroom.Speaker{
@@ -143,6 +145,8 @@ func (c SimulateCmd) Run() error {
 	sort.Slice(arrivals, func(i int, j int) bool {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
+
+	fmt.Printf("ITD: %fms\n", arrivals[0].ITD())
 
 	room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 
