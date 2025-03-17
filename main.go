@@ -140,7 +140,7 @@ func (c SimulateCmd) Run() error {
 
 	arrivals := []goroom.Arrival{}
 
-	if !c.SkipSpeakerInRoomCheck {
+	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
 		for i, source := range sources {
 			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
 			if !ok {
@@ -175,7 +175,7 @@ func (c SimulateCmd) Run() error {
 		}
 	}
 
-	if !c.SkipAddSpeakerWall {
+	if !(c.SkipAddSpeakerWall || config.Flags.SkipAddSpeakerWall) {
 		room.AddWall(lt.LeftSourcePosition(), lt.LeftSourceNormal(), "Left Speaker Wall", config.GetSurfaceAssignment("Left Speaker Wall"))
 		room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal(), "Right Speaker Wall", config.GetSurfaceAssignment("Right Speaker Wall"))
 	}
