@@ -201,8 +201,7 @@ func (r *Room) mesh() (*pt.Mesh, error) {
 }
 
 func (r *Room) AddWall(point pt.Vector, normal pt.Vector, name string, material Material) error {
-
-	surface := Surface{
+	surface := &Surface{
 		Name:     name,
 		Material: material,
 	}
@@ -216,19 +215,21 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector, name string, material 
 		if intersect {
 			// TODO: what about intersections with an existing vertex of the room? In that case p1 == p2 and the third vertex of the new triangle must come
 			// from another intersected triangle from the mesh
-			newTriangles = append(newTriangles, &Triangle{
+			tri := &Triangle{
 				Triangle: pt.Triangle{
-					V1: point,
-					V2: p1,
-					V3: p2,
+					V1:       point,
+					V2:       p1,
+					V3:       p2,
+					Material: &pt.Material{},
 				},
-				Surface: &surface,
-			})
+				Surface: surface,
+			}
+			tri.FixNormals()
+			newTriangles = append(newTriangles, tri)
 		}
 	}
 
-	r.M.Triangles = append(r.M.Triangles, newTriangles...)
-	r.M.Compile()
+	r.M = pt.NewMesh(append(r.M.Triangles, newTriangles...))
 
 	return nil
 }
@@ -243,25 +244,33 @@ func (r *Room) AddPrism(XBound, YBound, ZBound Bounds, name string, material Mat
 		pt.Vector{X: XBound.Max, Y: YBound.Max, Z: ZBound.Max},
 		pt.Material{})
 
+	newTriangles := []pt.TriangleInt{}
 	for _, tri := range cube.Mesh().Triangles {
-		r.M.Triangles = append(r.M.Triangles, &Triangle{
+		tri := &Triangle{
 			Triangle: *tri.T(),
 			Surface:  &Surface{Name: name, Material: material},
-		})
+		}
+		tri.FixNormals()
+		newTriangles = append(newTriangles, tri)
 	}
 
-	r.M.Compile()
+	r.M = pt.NewMesh(append(r.M.Triangles, newTriangles...))
 
 	return nil
 }
 
 func (r *Room) AddSurface(surface *Surface) error {
+	newTriangles := []pt.TriangleInt{}
 	for _, tri := range surface.M.Triangles {
-		r.M.Triangles = append(r.M.Triangles, &Triangle{
+		tri := &Triangle{
 			Triangle: *tri.T(),
 			Surface:  surface,
-		})
+		}
+		tri.FixNormals()
+		newTriangles = append(newTriangles, tri)
 	}
+	r.M = pt.NewMesh(append(r.M.Triangles, newTriangles...))
 	r.M.Compile()
+
 	return nil
 }
