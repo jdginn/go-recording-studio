@@ -33,10 +33,11 @@ func saveImage(filename string, i image.Image) error {
 	return png.Encode(f, i)
 }
 
-func addCeilingAbsorbers(r goroom.Room, lt goroom.ListeningTriangle, config roomConfig.ExperimentConfig) error {
+func addCeilingAbsorbers(r *goroom.Room, lt goroom.ListeningTriangle, config roomConfig.ExperimentConfig) error {
 	center := config.CeilingPanels.Center
 
 	if center != nil {
+		fmt.Printf("%+v\n", center)
 		r.AddPrism(
 			goroom.Bounds{
 				Min: center.XMin,
@@ -51,12 +52,14 @@ func addCeilingAbsorbers(r goroom.Room, lt goroom.ListeningTriangle, config room
 				Max: center.Height + center.Thickness,
 			},
 			"Center Ceiling Absorber",
-			config.GetSurfaceAssignment("Center Ceiling Absorber"),
+			goroom.Material{Alpha: 0.9999},
+			// config.GetSurfaceAssignment("Center Ceiling Absorber"),
 		)
 	}
 
 	sides := config.CeilingPanels.Sides
 	if sides != nil {
+		fmt.Printf("%+v\n", sides)
 		r.AddPrism(
 			goroom.Bounds{
 				Min: sides.XMin,
@@ -71,7 +74,8 @@ func addCeilingAbsorbers(r goroom.Room, lt goroom.ListeningTriangle, config room
 				Max: sides.Height + center.Thickness,
 			},
 			"Left Ceiling Absorber",
-			config.GetSurfaceAssignment("Left Ceiling Absorber"),
+			goroom.Material{Alpha: 0.999},
+			// config.GetSurfaceAssignment("Left Ceiling Absorber"),
 		)
 		r.AddPrism(
 			goroom.Bounds{
@@ -87,7 +91,8 @@ func addCeilingAbsorbers(r goroom.Room, lt goroom.ListeningTriangle, config room
 				Max: sides.Height + center.Thickness,
 			},
 			"Right Ceiling Absorber",
-			config.GetSurfaceAssignment("Right Ceiling Absorber"),
+			goroom.Material{Alpha: 0.999},
+			// config.GetSurfaceAssignment("Right Ceiling Absorber"),
 		)
 	}
 
@@ -206,7 +211,7 @@ func (c SimulateCmd) Run() error {
 	}
 
 	for _, name := range absorbers {
-		room.AddSurface(surfaces[name].Absorber(0.14, config.ListeningTriangle.ListenHeight, goroom.Material{
+		room.AddSurface(surfaces[name].Absorber(0.14, 1.5, goroom.Material{
 			Alpha: 0.999,
 		}))
 	}
@@ -250,7 +255,7 @@ func (c SimulateCmd) Run() error {
 			ListenPosDist: lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
 		},
 	}); err != nil {
-		return err
+		fmt.Println(err)
 	}
 
 	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, nil, arrivals, []goroom.Zone{{
