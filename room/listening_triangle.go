@@ -6,8 +6,10 @@ import (
 	"github.com/fogleman/pt/pt"
 )
 
-// Value from Rod Gervais' book Home Recording Studio: Build It Like The Pros
-const LISTEN_DIST_INTO_TRIANGLE = 0.38
+// // Value from Rod Gervais' book Home Recording Studio: Build It Like The Pros
+// const LISTEN_DIST_INTO_TRIANGLE = 0.38
+// Value from Thomas Northward posted on GearSpae
+const LISTEN_DIST_INTO_TRIANGLE = 0.32
 
 type ListeningTriangle struct {
 	// A point on the front wall
@@ -35,7 +37,7 @@ func (t ListeningTriangle) LeftSourcePosition() pt.Vector {
 }
 
 func (t ListeningTriangle) LeftSourceNormal() pt.Vector {
-	return t.ListenPosition().Sub(t.LeftSourcePosition()).Normalize()
+	return t.EquilateralPos().Sub(t.LeftSourcePosition()).Normalize()
 }
 
 func (t ListeningTriangle) RightSourcePosition() pt.Vector {
@@ -47,7 +49,15 @@ func (t ListeningTriangle) RightSourcePosition() pt.Vector {
 }
 
 func (t ListeningTriangle) RightSourceNormal() pt.Vector {
-	return t.ListenPosition().Sub(t.RightSourcePosition()).Normalize()
+	return t.EquilateralPos().Sub(t.RightSourcePosition()).Normalize()
+}
+
+func (t ListeningTriangle) EquilateralPos() pt.Vector {
+	return pt.Vector{
+		X: t.ReferencePosition.X + t.DistFromFront + (t.DistFromCenter / 2 * math.Sqrt(3)),
+		Y: t.ReferencePosition.Y,
+		Z: t.ListenHeight,
+	}
 }
 
 func (t ListeningTriangle) ListenPosition() pt.Vector {
