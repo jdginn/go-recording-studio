@@ -1,6 +1,6 @@
 module github.com/jdginn/go-recording-studio
 
-go 1.24rc1
+go 1.24
 
 require (
 	fyne.io/fyne/v2 v2.5.3
