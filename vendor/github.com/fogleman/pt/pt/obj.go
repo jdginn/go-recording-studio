@@ -28,7 +28,7 @@ func LoadOBJ(path string, parent Material) (*Mesh, error) {
 	vs := make([]Vector, 1, 1024)  // 1-based indexing
 	vts := make([]Vector, 1, 1024) // 1-based indexing
 	vns := make([]Vector, 1, 1024) // 1-based indexing
-	var triangles []TriangleInt
+	var triangles []*Triangle
 	materials := make(map[string]*Material)
 	material := &parent
 	scanner := bufio.NewScanner(file)

@@ -73,7 +73,7 @@ func (c *Cube) Mesh() *Mesh {
 	v101 := Vector{b.X, a.Y, b.Z}
 	v110 := Vector{b.X, b.Y, a.Z}
 	v111 := Vector{b.X, b.Y, b.Z}
-	triangles := []TriangleInt{
+	triangles := []*Triangle{
 		NewTriangle(v000, v100, v110, z, z, z, m),
 		NewTriangle(v000, v110, v010, z, z, z, m),
 		NewTriangle(v001, v101, v111, z, z, z, m),

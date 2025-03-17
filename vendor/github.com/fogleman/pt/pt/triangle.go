@@ -1,19 +1,10 @@
 package pt
 
-type TriangleInt interface {
-	Shape
-	T() *Triangle
-}
-
 type Triangle struct {
 	Material   *Material
 	V1, V2, V3 Vector
 	N1, N2, N3 Vector
 	T1, T2, T3 Vector
-}
-
-func (t *Triangle) T() *Triangle {
-	return t
 }
 
 func NewTriangle(v1, v2, v3, t1, t2, t3 Vector, material Material) *Triangle {
@@ -75,22 +66,7 @@ func (t *Triangle) Intersect(r Ray) Hit {
 	if d < EPS {
 		return NoHit
 	}
-
-	position := r.Position(d)
-	normal := t.NormalAt(position)
-	inside := false
-	if normal.Dot(r.Direction) > 0 {
-		normal = normal.Negate()
-		inside = true
-	}
-
-	// Calculate proper reflection direction
-	dot := r.Direction.Dot(normal)
-	reflectDir := r.Direction.Sub(normal.MulScalar(2 * dot))
-
-	ray := Ray{position, reflectDir}
-	info := HitInfo{t, position, normal, ray, t.MaterialAt(position), inside}
-	return Hit{t, d, &info}
+	return Hit{t, d, nil}
 }
 
 func (t *Triangle) UV(p Vector) Vector {
@@ -130,8 +106,7 @@ func (t *Triangle) NormalAt(p Vector) Vector {
 			T.X, B.X, N.X, 0,
 			T.Y, B.Y, N.Y, 0,
 			T.Z, B.Z, N.Z, 0,
-			0, 0, 0, 1,
-		}
+			0, 0, 0, 1}
 		n = matrix.MulDirection(ns)
 	}
 	if t.Material.BumpTexture != nil {
