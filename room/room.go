@@ -124,7 +124,7 @@ type Room struct {
 
 const SCALE = 1000
 
-func NewFrom3MF(filepath string, materials map[string]Material) (Room, map[string]*Surface, error) {
+func NewFrom3MF(filepath string, materials map[string]Material) (*Room, map[string]*Surface, error) {
 	surfaces := make(map[string]*Surface)
 
 	if _, ok := materials["default"]; !ok {
@@ -134,11 +134,11 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, map[strin
 	var model go3mf.Model
 	r, err := go3mf.OpenReader(filepath)
 	if err != nil {
-		return Room{}, surfaces, err
+		return &Room{}, surfaces, err
 	}
 	r.Decode(&model)
 
-	room := Room{}
+	room := &Room{}
 
 	triangles := []pt.TriangleInt{}
 	for _, item := range model.Build.Items {
@@ -230,6 +230,7 @@ func (r *Room) AddWall(point pt.Vector, normal pt.Vector, name string, material 
 	}
 
 	r.M = pt.NewMesh(append(r.M.Triangles, newTriangles...))
+	// r.M.Compile()
 
 	return nil
 }
@@ -255,6 +256,7 @@ func (r *Room) AddPrism(XBound, YBound, ZBound Bounds, name string, material Mat
 	}
 
 	r.M = pt.NewMesh(append(r.M.Triangles, newTriangles...))
+	r.M.Compile()
 
 	return nil
 }
