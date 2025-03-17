@@ -27,6 +27,8 @@ surface_assignments:
     left speaker wall: "gypsum"
     right speaker wall: "gypsum"
     Center Ceiling Absorber: "rockwool_24cm"
+    Left Ceiling Absorber: "rockwool_24cm"
+    Right Ceiling Absorber: "rockwool_24cm"
 
 speaker:
   model: "MUM8"
