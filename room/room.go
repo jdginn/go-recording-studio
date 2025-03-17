@@ -12,6 +12,43 @@ type Material struct {
 type Surface struct {
 	Name     string
 	Material Material
+	M        *pt.Mesh
+}
+
+func (s *Surface) Normal() pt.Vector {
+	// Assumes we only use this on flat surfaces
+	return s.M.Triangles[0].T().Normal()
+}
+
+func (s *Surface) Absorber(thickness, height float64, material Material) *Surface {
+	min := s.M.BoundingBox().Min
+	max := s.M.BoundingBox().Max
+
+	// Need to take normal direction into accout when delaing with the thickness
+
+	if max.X-min.X == 0 {
+		cube := pt.NewCube(
+			pt.Vector{X: min.X - thickness, Y: min.Y, Z: min.Z},
+			pt.Vector{X: min.X + thickness, Y: max.Y, Z: min.Z + height},
+			pt.Material{})
+		return &Surface{
+			s.Name + "_absorber",
+			material,
+			cube.Mesh(),
+		}
+	}
+	if max.Y-min.Y == 0 {
+		cube := pt.NewCube(
+			pt.Vector{X: min.X, Y: min.Y - thickness, Z: min.Z},
+			pt.Vector{X: max.X, Y: min.Y + thickness, Z: min.Z + height},
+			pt.Material{})
+		return &Surface{
+			s.Name + "_absorber",
+			material,
+			cube.Mesh(),
+		}
+	}
+	panic("Surface is not on a normal we know how to work with")
 }
 
 type Triangle struct {
@@ -87,7 +124,9 @@ type Room struct {
 
 const SCALE = 1000
 
-func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
+func NewFrom3MF(filepath string, materials map[string]Material) (Room, map[string]*Surface, error) {
+	surfaces := make(map[string]*Surface)
+
 	if _, ok := materials["default"]; !ok {
 		materials["default"] = Material{0.2}
 	}
@@ -95,7 +134,7 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 	var model go3mf.Model
 	r, err := go3mf.OpenReader(filepath)
 	if err != nil {
-		return Room{}, err
+		return Room{}, surfaces, err
 	}
 	r.Decode(&model)
 
@@ -116,9 +155,10 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 			Name:     obj.Name,
 			Material: material,
 		}
+		theseTriangles := make([]pt.TriangleInt, len(obj.Mesh.Triangles.Triangle))
 
 		if obj.Mesh != nil {
-			for _, t := range obj.Mesh.Triangles.Triangle {
+			for i, t := range obj.Mesh.Triangles.Triangle {
 				ptTri := pt.Triangle{Material: &pt.Material{}}
 				ptTri.V1 = pt.Vector{
 					X: float64(obj.Mesh.Vertices.Vertex[t.V1].X() / SCALE),
@@ -137,12 +177,16 @@ func NewFrom3MF(filepath string, materials map[string]Material) (Room, error) {
 				}
 				ptTri.FixNormals()
 				triangles = append(triangles, &Triangle{Triangle: ptTri, Surface: surface})
+				theseTriangles[i] = &ptTri
 			}
+			surface.M = pt.NewMesh(theseTriangles)
 		}
+
+		surfaces[obj.Name] = surface
 	}
 	room.M = pt.NewMesh(triangles)
 	room.M.Compile()
-	return room, nil
+	return room, surfaces, nil
 }
 
 func NewEmptyRoom() Room {
@@ -208,5 +252,16 @@ func (r *Room) AddPrism(XBound, YBound, ZBound Bounds, name string, material Mat
 
 	r.M.Compile()
 
+	return nil
+}
+
+func (r *Room) AddSurface(surface *Surface) error {
+	for _, tri := range surface.M.Triangles {
+		r.M.Triangles = append(r.M.Triangles, &Triangle{
+			Triangle: *tri.T(),
+			Surface:  surface,
+		})
+	}
+	r.M.Compile()
 	return nil
 }

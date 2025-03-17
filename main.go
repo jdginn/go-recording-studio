@@ -122,10 +122,12 @@ func (c SimulateCmd) Run() error {
 		return fmt.Errorf("copying config file: %w", err)
 	}
 
-	room, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
+	room, surfaces, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
 	if err != nil {
 		return err
 	}
+
+	fmt.Println(surfaces["Floor"].M.BoundingBox())
 
 	lt := config.ListeningTriangle.Create()
 
@@ -176,6 +178,37 @@ func (c SimulateCmd) Run() error {
 	}
 
 	addCeilingAbsorbers(room, lt, *config)
+
+	for surface := range surfaces {
+		fmt.Println(surface)
+	}
+
+	HEIGHT := 1.3
+	absorbers := []string{
+		"Hall B",
+		"Street A",
+		// "Window B",
+		// "Cutout Side",
+		"Door Side A",
+		"Hall E",
+		"Street D",
+		"Street B",
+		"Door Side B",
+		"Entry Back",
+		"Street C",
+		"Street E",
+		"Hall A",
+		"Entry Front",
+		"Door",
+		"Back A",
+		"Back B",
+	}
+
+	for _, name := range absorbers {
+		room.AddSurface(surfaces[name].Absorber(0.14, HEIGHT, goroom.Material{
+			Alpha: 0.999,
+		}))
+	}
 
 	for _, source := range sources {
 		for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
