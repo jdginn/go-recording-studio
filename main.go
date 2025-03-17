@@ -127,8 +127,6 @@ func (c SimulateCmd) Run() error {
 		return err
 	}
 
-	fmt.Println(surfaces["Floor"].M.BoundingBox())
-
 	lt := config.ListeningTriangle.Create()
 
 	fmt.Printf("Listening position is %fm from front wall.\n\n", lt.ListenPosition().X)
@@ -157,7 +155,7 @@ func (c SimulateCmd) Run() error {
 					Color:    goroom.PastelRed,
 					Name:     fmt.Sprint("source_%d_bad_intersection", i),
 				}
-				if err := goroom.SavePointsArrivalsZonesToJSON("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
+				if err := goroom.SaveAnnotationsToJson("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
 					{
 						Points:    []goroom.Point{p1, p2},
 						Name:      "",
@@ -167,7 +165,12 @@ func (c SimulateCmd) Run() error {
 				}, nil, nil); err != nil {
 					return err
 				}
-				return fmt.Errorf("ERROR: speaker does not fit in room")
+
+				goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
+					Status:  "validation_error",
+					Errors:  []string{"speaker_outside_room"},
+					Results: goroom.AnalysisResults{},
+				})
 			}
 		}
 	}
@@ -183,11 +186,9 @@ func (c SimulateCmd) Run() error {
 		fmt.Println(surface)
 	}
 
-	HEIGHT := 1.3
 	absorbers := []string{
 		"Hall B",
 		"Street A",
-		// "Window B",
 		// "Cutout Side",
 		"Door Side A",
 		"Hall E",
@@ -205,7 +206,7 @@ func (c SimulateCmd) Run() error {
 	}
 
 	for _, name := range absorbers {
-		room.AddSurface(surfaces[name].Absorber(0.14, HEIGHT, goroom.Material{
+		room.AddSurface(surfaces[name].Absorber(0.14, config.ListeningTriangle.ListenHeight, goroom.Material{
 			Alpha: 0.999,
 		}))
 	}
@@ -219,7 +220,16 @@ func (c SimulateCmd) Run() error {
 				RFZRadius:     config.Simulation.RFZRadius,
 			})
 			if err != nil {
-				panic(err)
+				if saveErr := goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
+					Status: "simulation_error",
+					Errors: []string{err.Error()},
+					Results: goroom.AnalysisResults{
+						ListenPosDist: lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
+					},
+				}); saveErr != nil {
+					return err
+				}
+				return err
 			}
 			if arrival.Distance != goroom.INF {
 				arrivals = append(arrivals, arrival)
@@ -231,11 +241,19 @@ func (c SimulateCmd) Run() error {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
-	fmt.Printf("ITD: %fms\n", arrivals[0].ITD())
-
 	room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 
-	if err := goroom.SavePointsArrivalsZonesToJSON(expDir.GetFilePath("annotations.json"), nil, nil, arrivals, []goroom.Zone{{
+	if err := goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
+		Status: "success",
+		Results: goroom.AnalysisResults{
+			ITD:           arrivals[0].ITD(),
+			ListenPosDist: lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
+		},
+	}); err != nil {
+		return err
+	}
+
+	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, nil, arrivals, []goroom.Zone{{
 		Center: lt.ListenPosition(),
 		Radius: config.Simulation.RFZRadius,
 	}}); err != nil {

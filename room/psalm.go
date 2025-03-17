@@ -207,8 +207,8 @@ type Point struct {
 	Color    string
 }
 
-// SavePointsArrivalsZonesToJSON saves points, paths, and both types of paths to a JSON file
-func SavePointsArrivalsZonesToJSON(filename string, points []Point, paths []PsalmPath, arrivals []Arrival, zones []Zone) error {
+// SaveAnnotationsToJson saves points, paths, and both types of paths to a JSON file
+func SaveAnnotationsToJson(filename string, points []Point, paths []PsalmPath, arrivals []Arrival, zones []Zone) error {
 	container := struct {
 		Points        []PointJSON        `json:"points,omitempty"`
 		Paths         []PathJSON         `json:"paths,omitempty"`
@@ -246,6 +246,29 @@ func SavePointsArrivalsZonesToJSON(filename string, points []Point, paths []Psal
 	data, err := json.MarshalIndent(container, "", "  ")
 	if err != nil {
 		return fmt.Errorf("error marshaling points and paths: %w", err)
+	}
+
+	return os.WriteFile(filename, data, 0644)
+}
+
+// Summary Results Schema
+type ResultsSummary struct {
+	Status  string          `json:"status"`
+	Errors  []string        `json:"errors,omitempty"`
+	Results AnalysisResults `json:"results"`
+}
+
+type AnalysisResults struct {
+	ITD           float64 `json:"ITD,omitempty"`
+	ITD2          float64 `json:"ITD_2,omitempty"`
+	AvgGain5ms    float64 `json:"avg_gain_5ms,omitempty"`
+	ListenPosDist float64 `json:"listen_pos_dist,omitempty"`
+}
+
+func SaveResultsSummaryToJSON(filename string, results ResultsSummary) error {
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshaling summary results: %w", err)
 	}
 
 	return os.WriteFile(filename, data, 0644)
