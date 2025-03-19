@@ -105,10 +105,11 @@ func rayHemisphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt
 // TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
 //
 // See the Params struct type.
-func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Arrival, error) {
+func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]Arrival, error) {
+	arrivals := []Arrival{}
 	mesh, err := r.mesh()
 	if err != nil {
-		return Arrival{}, err
+		return arrivals, err
 	}
 	currentRay := shot.Ray
 	gain := shot.Gain
@@ -117,7 +118,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 	for i := 0; i < params.Order; i++ {
 		hit := mesh.Intersect(currentRay)
 		if !hit.Ok() {
-			return NoHit, fmt.Errorf("Nonterminating ray")
+			return arrivals, fmt.Errorf("Nonterminating ray")
 		}
 		info := hit.Info(currentRay)
 		hitPositions = append(hitPositions, Reflection{
@@ -136,14 +137,14 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 		pastGainThresh := toDB(gain) <= params.GainThreshold
 		pastTimeThresh := distance/SPEED_OF_SOUND > params.TimeThreshold
 		if pastMaxOrder || pastGainThresh || pastTimeThresh {
-			return NoHit, nil
+			return arrivals, nil
 		}
 
 		pos, isWithinRFZ := rayHemisphereIntersection(currentRay, listenPos, params.RFZRadius)
 
 		if isWithinRFZ {
 			distToRFZ := pos.Sub(currentRay.Origin).Length()
-			return Arrival{
+			arrivals = append(arrivals, Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
@@ -151,7 +152,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) (Ar
 				Distance:                distance + distToRFZ,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
-			}, nil
+			})
 		}
 
 	}
