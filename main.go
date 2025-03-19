@@ -246,6 +246,12 @@ func (c SimulateCmd) Run() error {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
+	var ITD float64
+	if len(arrivals) > 0 {
+		ITD = arrivals[0].ITD()
+	} else {
+		ITD = config.Simulation.TimeThresholdMS
+	}
 	energyOverWindow, err := goroom.EnergyOverWindow(arrivals, 25, -15)
 	if err != nil {
 		print(err)
@@ -256,7 +262,7 @@ func (c SimulateCmd) Run() error {
 	if err := goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
 		Status: "success",
 		Results: goroom.AnalysisResults{
-			ITD:              arrivals[0].ITD(),
+			ITD:              ITD,
 			EnergyOverWindow: energyOverWindow / float64(totalShots),
 			ListenPosDist:    lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
 		},
