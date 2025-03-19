@@ -216,8 +216,10 @@ func (c SimulateCmd) Run() error {
 		}))
 	}
 
+	totalShots := 0
 	for _, source := range sources {
 		for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
+			totalShots += 1
 			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
 				Order:         config.Simulation.Order,
 				GainThreshold: config.Simulation.GainThresholdDB,
@@ -236,9 +238,7 @@ func (c SimulateCmd) Run() error {
 				}
 				return err
 			}
-			if arrival.Distance != goroom.INF {
-				arrivals = append(arrivals, arrival)
-			}
+			arrivals = append(arrivals, arrival...)
 		}
 	}
 
@@ -246,13 +246,19 @@ func (c SimulateCmd) Run() error {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
 
+	energyOverWindow, err := goroom.EnergyOverWindow(arrivals, 25, -15)
+	if err != nil {
+		print(err)
+	}
+
 	room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 
 	if err := goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
 		Status: "success",
 		Results: goroom.AnalysisResults{
-			ITD:           arrivals[0].ITD(),
-			ListenPosDist: lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
+			ITD:              arrivals[0].ITD(),
+			EnergyOverWindow: energyOverWindow / float64(totalShots),
+			ListenPosDist:    lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
 		},
 	}); err != nil {
 		fmt.Println(err)

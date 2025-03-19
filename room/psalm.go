@@ -259,10 +259,11 @@ type ResultsSummary struct {
 }
 
 type AnalysisResults struct {
-	ITD           float64 `json:"ITD,omitempty"`
-	ITD2          float64 `json:"ITD_2,omitempty"`
-	AvgGain5ms    float64 `json:"avg_gain_5ms,omitempty"`
-	ListenPosDist float64 `json:"listen_pos_dist,omitempty"`
+	ITD              float64 `json:"ITD,omitempty"`
+	EnergyOverWindow float64 `json:"avg_energy_over_window,omitempty"`
+	ITD2             float64 `json:"ITD_2,omitempty"`
+	AvgGain5ms       float64 `json:"avg_gain_5ms,omitempty"`
+	ListenPosDist    float64 `json:"listen_pos_dist,omitempty"`
 }
 
 func SaveResultsSummaryToJSON(filename string, results ResultsSummary) error {
