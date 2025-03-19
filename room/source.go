@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sort"
 
 	"gonum.org/v1/gonum/num/quat"
 	"gonum.org/v1/gonum/spatial/r3"
@@ -40,17 +41,23 @@ func NewDirectivity(horiz, vert map[float64]float64) directivity {
 			m[0] = 0
 		}
 
+		// Create a slice of angle keys for sorting
 		angles := make([]float64, 0, len(m))
-		gains := make([]float64, 0, len(m))
-
-		// Collect and validate angles/gains
-		for angle, gain := range m {
+		for angle := range m {
 			if angle < 0 {
 				log.Printf("Warning: ignoring negative angle %.2f in %s directivity map.", angle, name)
 				continue
 			}
 			angles = append(angles, angle)
-			gains = append(gains, gain)
+		}
+
+		// Sort angles in ascending order
+		sort.Float64s(angles)
+
+		// Create corresponding gains slice maintaining the sorted order
+		gains := make([]float64, len(angles))
+		for i, angle := range angles {
+			gains[i] = m[angle]
 		}
 
 		return angles, gains
