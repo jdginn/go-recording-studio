@@ -48,8 +48,18 @@ type Arrival struct {
 	NearestApproachPosition pt.Vector
 }
 
+// Returns the distance traveled by the direct signal from source to position of last reflection
+func (a Arrival) DirectDist() float64 {
+	return a.Shot.Ray.Origin.Sub(a.NearestApproachPosition).Length()
+}
+
+// Returns time delay between direct signal and reflection, in milliseconds
 func (a Arrival) ITD() float64 {
-	return (a.Distance - a.Shot.Ray.Origin.Sub(a.LastReflection).Length()) / SPEED_OF_SOUND * 1000
+	return (a.Distance - a.DirectDist()) / SPEED_OF_SOUND * 1000
+}
+
+func (a Arrival) NullFreq() float64 {
+	return SPEED_OF_SOUND / 2 / (a.Distance - a.DirectDist())
 }
 
 const INF = 1e9
@@ -143,7 +153,13 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 		pos, isWithinRFZ := rayHemisphereIntersection(currentRay, listenPos, params.RFZRadius)
 
 		if isWithinRFZ {
+			// TODO:
+			// From dist , get null frequency
+			// With null frequency, calculate all gains based on frequency
+
 			distToRFZ := pos.Sub(currentRay.Origin).Length()
+			// finalDist := distance + distToRFZ
+
 			arrivals = append(arrivals, Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
@@ -153,6 +169,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
 			})
+			fmt.Printf("Dist: %f, dist_diff: %f, null_freq: %f\n", distance+distToRFZ, arrivals[len(arrivals)-1].Distance-arrivals[len(arrivals)-1].DirectDist(), arrivals[len(arrivals)-1].NullFreq())
 		}
 
 	}
