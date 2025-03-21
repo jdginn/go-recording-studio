@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	ExperimentsDir = "experiments"
-	LatestSymlink  = "latest"
+	LatestSymlink = "latest"
 )
 
 type ExperimentDir struct {
@@ -18,10 +17,19 @@ type ExperimentDir struct {
 	Timestamp time.Time // When the experiment was created
 }
 
+func UseExistingExperimentDirectory(path string) (*ExperimentDir, error) {
+	return &ExperimentDir{
+		Path: path,
+	}, nil
+}
+
 // CreateExperimentDirectory creates a new experiment directory and returns its path
-func CreateExperimentDirectory() (*ExperimentDir, error) {
+func CreateExperimentDirectory(path string) (*ExperimentDir, error) {
+	if path == "" {
+		path = "experiments"
+	}
 	// Ensure experiments directory exists
-	if err := os.MkdirAll(ExperimentsDir, 0755); err != nil {
+	if err := os.MkdirAll(path, 0755); err != nil {
 		return nil, fmt.Errorf("creating experiments directory: %w", err)
 	}
 
@@ -29,7 +37,7 @@ func CreateExperimentDirectory() (*ExperimentDir, error) {
 	id := GenerateExperimentID()
 
 	// Create absolute path for new experiment
-	absPath, err := filepath.Abs(filepath.Join(ExperimentsDir, id))
+	absPath, err := filepath.Abs(filepath.Join(path, id))
 	if err != nil {
 		return nil, fmt.Errorf("getting absolute path: %w", err)
 	}
@@ -40,7 +48,7 @@ func CreateExperimentDirectory() (*ExperimentDir, error) {
 	}
 
 	// Create symlink to latest experiment
-	latestPath := filepath.Join(ExperimentsDir, LatestSymlink)
+	latestPath := filepath.Join(path, LatestSymlink)
 	_ = os.Remove(latestPath) // Remove existing symlink if it exists
 	if err := os.Symlink(id, latestPath); err != nil {
 		// Don't fail if symlink creation fails

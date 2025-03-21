@@ -100,11 +100,12 @@ func addCeilingAbsorbers(r *goroom.Room, lt goroom.ListeningTriangle, config roo
 }
 
 var CLI struct {
-	Simulate SimulateCmd `cmd:"" help:"Simualte a room"`
+	Simulate SimulateCmd `cmd:"" help:"Simulate a room"`
 }
 
 type SimulateCmd struct {
 	Config                 string `arg:"" name:"config" help:"config file to simulate"`
+	OutputDir              string `arg:"" optional:"" name:"output-dir" help:"directory to store output in"`
 	SkipSpeakerInRoomCheck bool   `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
 	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
 }
@@ -119,9 +120,11 @@ func (c SimulateCmd) Run() error {
 		return err
 	}
 
-	expDir, err := roomExperiment.CreateExperimentDirectory()
-	if err != nil {
-		return fmt.Errorf("creating experiment directory: %w", err)
+	var expDir *roomExperiment.ExperimentDir
+	if c.OutputDir != "" {
+		expDir, err = roomExperiment.UseExistingExperimentDirectory(c.OutputDir)
+	} else {
+		expDir, err = roomExperiment.CreateExperimentDirectory("experiments")
 	}
 	if err := expDir.CopyConfigFile(c.Config); err != nil {
 		return fmt.Errorf("copying config file: %w", err)
@@ -153,12 +156,12 @@ func (c SimulateCmd) Run() error {
 				p1 := goroom.Point{
 					Position: offendingVertex,
 					Color:    goroom.PastelRed,
-					Name:     fmt.Sprint("source_%d", i),
+					Name:     fmt.Sprintf("source_%d", i),
 				}
 				p2 := goroom.Point{
 					Position: intersectingPoint,
 					Color:    goroom.PastelRed,
-					Name:     fmt.Sprint("source_%d_bad_intersection", i),
+					Name:     fmt.Sprintf("source_%d_bad_intersection", i),
 				}
 				if err := goroom.SaveAnnotationsToJson("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
 					{
@@ -176,6 +179,7 @@ func (c SimulateCmd) Run() error {
 					Errors:  []string{"speaker_outside_room"},
 					Results: goroom.AnalysisResults{},
 				})
+				return nil
 			}
 		}
 	}
@@ -187,32 +191,9 @@ func (c SimulateCmd) Run() error {
 
 	addCeilingAbsorbers(room, lt, *config)
 
-	for surface := range surfaces {
-		fmt.Println(surface)
-	}
-
-	absorbers := []string{
-		"Hall B",
-		"Street A",
-		// "Cutout Side",
-		"Door Side A",
-		"Hall E",
-		"Street D",
-		"Street B",
-		"Door Side B",
-		"Entry Back",
-		"Street C",
-		"Street E",
-		"Hall A",
-		"Entry Front",
-		"Door",
-		"Back A",
-		"Back B",
-	}
-
-	for _, name := range absorbers {
-		room.AddSurface(surfaces[name].Absorber(0.14, 1.5, goroom.Material{
-			Alpha: 0.999,
+	for name, height := range config.WallAbsorbers.Heights {
+		room.AddSurface(surfaces[name].Absorber(config.WallAbsorbers.Thickness, height, goroom.Material{
+			Alpha: 0.9,
 		}))
 	}
 

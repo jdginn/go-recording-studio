@@ -17,6 +17,7 @@ type ExperimentConfig struct {
 	Simulation         Simulation         `yaml:"simulation"`
 	Flags              Flags              `yaml:"flags"`
 	CeilingPanels      CeilingPanels      `yaml:"ceiling_panels"`
+	WallAbsorbers      WallAbsorbers      `yaml:"wall_absorbers"`
 }
 
 func (c ExperimentConfig) SurfaceAssignmentMap() map[string]room.Material {
@@ -162,4 +163,9 @@ type CeilingPanels struct {
 		XMin      float64 `yaml:"xmin"`
 		XMax      float64 `yaml:"xmax"`
 	} `yaml:"sides,omitempty"`
+}
+
+type WallAbsorbers struct {
+	Thickness float64            `yaml:"thickness"`
+	Heights   map[string]float64 `yaml:"heights"`
 }
