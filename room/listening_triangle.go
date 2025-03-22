@@ -54,19 +54,22 @@ func (t ListeningTriangle) RightSourceNormal() pt.Vector {
 }
 
 func (t ListeningTriangle) EquilateralPos() pt.Vector {
-	distFromSourceLine := t.DistFromCenter * math.Sqrt(3)
+	sourceDistance := 2 * t.DistFromCenter
+	horizontalDist := sourceDistance * math.Sqrt(3) / 2
 
-	// Calculate how much lower the equilateral point needs to be than the listening height
-	// to maintain equal distances when the listening position is moved up and in
+	// Calculate the angle of the plane using the horizontal distance to equilateral point
+	// and the height difference between sources and listening position
+	planeAngle := math.Atan2(t.SourceHeight-t.ListenHeight, horizontalDist)
 
-	// If we move LISTEN_DIST_INTO_TRIANGLE towards the sources and ListenHeight is higher,
-	// we can calculate the required height difference using similar triangles
-	heightDrop := LISTEN_DIST_INTO_TRIANGLE * math.Tan(math.Atan2(t.SourceHeight-t.ListenHeight, distFromSourceLine))
+	// Calculate the Z-coordinate of equilateral position
+	// Using the angle and LISTEN_DIST_INTO_TRIANGLE, we can determine how much lower
+	// the equilateral point should be than ListenHeight
+	heightDifference := LISTEN_DIST_INTO_TRIANGLE * math.Sin(planeAngle)
 
 	return pt.Vector{
-		X: t.ReferencePosition.X + t.DistFromFront + distFromSourceLine,
+		X: t.ReferencePosition.X + t.DistFromFront + horizontalDist,
 		Y: t.ReferencePosition.Y,
-		Z: t.ListenHeight - heightDrop,
+		Z: t.ListenHeight - heightDifference,
 	}
 }
 
@@ -74,17 +77,16 @@ func (t ListeningTriangle) ListenPosition() pt.Vector {
 	equilateralPos := t.EquilateralPos()
 
 	// Calculate the angle of the triangle's plane
-	distFromSourceLine := t.DistFromCenter * math.Sqrt(3)
-	planeAngle := math.Atan2(t.SourceHeight-t.ListenHeight, distFromSourceLine)
+	horizontalDist := 2 * t.DistFromCenter * math.Sqrt(3) / 2
+	planeAngle := math.Atan2(t.SourceHeight-t.ListenHeight, horizontalDist)
 
 	// Move LISTEN_DIST_INTO_TRIANGLE along the plane of the triangle
 	deltaX := LISTEN_DIST_INTO_TRIANGLE * math.Cos(planeAngle)
-	deltaZ := LISTEN_DIST_INTO_TRIANGLE * math.Sin(planeAngle)
 
 	return pt.Vector{
 		X: equilateralPos.X - deltaX,
 		Y: equilateralPos.Y,
-		Z: equilateralPos.Z + deltaZ,
+		Z: t.ListenHeight,
 	}
 }
 
