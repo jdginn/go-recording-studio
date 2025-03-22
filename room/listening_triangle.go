@@ -38,7 +38,8 @@ func (t ListeningTriangle) LeftSourcePosition() pt.Vector {
 }
 
 func (t ListeningTriangle) LeftSourceNormal() pt.Vector {
-	return t.EquilateralPos().Sub(t.LeftSourcePosition()).Normalize()
+	_, equilateralPos := t.ListenPosition()
+	return equilateralPos.Sub(t.LeftSourcePosition()).Normalize()
 }
 
 func (t ListeningTriangle) RightSourcePosition() pt.Vector {
@@ -50,50 +51,62 @@ func (t ListeningTriangle) RightSourcePosition() pt.Vector {
 }
 
 func (t ListeningTriangle) RightSourceNormal() pt.Vector {
-	return t.EquilateralPos().Sub(t.RightSourcePosition()).Normalize()
+	_, equilateralPos := t.ListenPosition()
+	return equilateralPos.Sub(t.RightSourcePosition()).Normalize()
 }
 
-func (t ListeningTriangle) EquilateralPos() pt.Vector {
-	sourceDistance := 2 * t.DistFromCenter
-	horizontalDist := sourceDistance * math.Sqrt(3) / 2
+// ListenPosition returns two points: the ideal Listening Position within the room and the position of a
+// hypothetical equilateral triangle with the two sources.
+//
+// The Listening Position is a constant distance into the triangle (TOWARDS the line connecting the two sources),
+// to place the listener's ears directly on the paths from source to the third point of the equilateral triangle ("EquilateralPos").
+func (t ListeningTriangle) ListenPosition() (ListenPos, EquilateralPos pt.Vector) {
+	sourceToEquilateral := 2 * t.DistFromCenter
 
-	// Calculate the angle of the plane using the horizontal distance to equilateral point
-	// and the height difference between sources and listening position
-	planeAngle := math.Atan2(t.SourceHeight-t.ListenHeight, horizontalDist)
+	// Use proportional triangles to find the height drop from the listen position to the equilateral position
+	//
+	// First, get the distance along the hypotenuse (a.k.a. the path from listen position to the equilateral point)
+	// using 30-60-90 triangle properties
+	alongHypotenuse := LISTEN_DIST_INTO_TRIANGLE * 2 / math.Sqrt(3)
+	distAlongHypotenuseToListenPos := sourceToEquilateral - alongHypotenuse
+	heightDropToListenPos := t.SourceHeight - t.ListenHeight
+	// This is a proportional trianlge
+	heightDropToEquilateralPos := heightDropToListenPos / distAlongHypotenuseToListenPos * alongHypotenuse
 
-	// Calculate the Z-coordinate of equilateral position
-	// Using the angle and LISTEN_DIST_INTO_TRIANGLE, we can determine how much lower
-	// the equilateral point should be than ListenHeight
-	heightDifference := LISTEN_DIST_INTO_TRIANGLE * math.Sin(planeAngle)
+	// Solve for the X-position of the equilateral point based on the following relationship:
+	// The distance from source to equilateralPosition MUST equal sourceToEquilateral
+	// Use equation for distance between two points
+	//     length = sqrt((a.x-b.x)^2+(a.y-b.y)^2+(a.z-b.z)^2)
+	// We know everything except a.x, so we can solve the equation for equialteralPosX
+	sourceX := t.ReferencePosition.X + t.DistFromFront
+	sourceZ := t.SourceHeight
+	equilateralPosZ := t.ListenHeight - heightDropToEquilateralPos
+	equilateralPosX := math.Sqrt(math.Pow(sourceToEquilateral, 2)-math.Pow((equilateralPosZ-sourceZ), 2)-math.Pow(t.DistFromCenter, 2)) + sourceX
 
-	return pt.Vector{
-		X: t.ReferencePosition.X + t.DistFromFront + horizontalDist,
+	// Set up the two positions
+	EquilateralPos = pt.Vector{
+		X: equilateralPosX,
 		Y: t.ReferencePosition.Y,
-		Z: t.ListenHeight - heightDifference,
+		Z: equilateralPosZ,
 	}
-}
 
-func (t ListeningTriangle) ListenPosition() pt.Vector {
-	equilateralPos := t.EquilateralPos()
-
-	// Calculate the angle of the triangle's plane
-	horizontalDist := 2 * t.DistFromCenter * math.Sqrt(3) / 2
-	planeAngle := math.Atan2(t.SourceHeight-t.ListenHeight, horizontalDist)
-
-	// Move LISTEN_DIST_INTO_TRIANGLE along the plane of the triangle
-	deltaX := LISTEN_DIST_INTO_TRIANGLE * math.Cos(planeAngle)
-
-	return pt.Vector{
-		X: equilateralPos.X - deltaX,
-		Y: equilateralPos.Y,
+	ListenPos = pt.Vector{
+		// Use the distance between two points again, this time based on the rknown relationship:
+		// The distance from ListenPos to EquilateralPOs MUST equal LISTEN_DIST_INTO_TRIANGLE
+		X: EquilateralPos.X - math.Sqrt(math.Pow(LISTEN_DIST_INTO_TRIANGLE, 2)-math.Pow(heightDropToEquilateralPos, 2)),
+		Y: t.ReferencePosition.Y,
 		Z: t.ListenHeight,
 	}
+
+	return ListenPos, EquilateralPos
 }
 
 func (t ListeningTriangle) ListenDistance() float64 {
-	return math.Abs(t.ListenPosition().Sub(t.LeftSourcePosition()).Length())
+	listenPos, _ := t.ListenPosition()
+	return math.Abs(listenPos.Sub(t.LeftSourcePosition()).Length())
 }
 
 func (t ListeningTriangle) Deviation(listenPos pt.Vector) float64 {
-	return math.Abs(listenPos.Sub(t.ListenPosition()).Length())
+	canonicalListenPos, _ := t.ListenPosition()
+	return math.Abs(listenPos.Sub(canonicalListenPos).Length())
 }
