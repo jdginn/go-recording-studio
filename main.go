@@ -145,6 +145,16 @@ func (c SimulateCmd) Run() error {
 		goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
 		goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal()),
 	}
+	fmt.Printf("dist_between_monitors: %f, dist_to_equilateral: %f\n\n", lt.LeftSourcePosition().Sub(lt.RightSourcePosition()).Length(), lt.EquilateralPos().Sub(lt.LeftSourcePosition()).Length())
+	fmt.Printf("dist_between_monitors: %f, dist_to_listen_pos: %f\n\n", lt.LeftSourcePosition().Sub(lt.RightSourcePosition()).Length(), lt.ListenPosition().Sub(lt.LeftSourcePosition()).Length())
+	fmt.Printf("dist_into_triangle: %f\n\n", lt.EquilateralPos().Sub(lt.ListenPosition()).Length())
+	fmt.Printf("l_source_pos: %v\n", lt.LeftSourcePosition())
+	fmt.Printf("listen_pos: %v\n", lt.ListenPosition())
+	fmt.Printf("equilateral_pos: %v\n", lt.EquilateralPos())
+	lDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.LeftSourcePosition()}, {Position: lt.EquilateralPos()}}, Color: goroom.BrightRed}
+	rDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.RightSourcePosition()}, {Position: lt.EquilateralPos()}}, Color: goroom.BrightRed}
+	lSpeakerCone, err := room.GetSpeakerCone(sources[0], 30, 16, goroom.PastelGreen)
+	rSpeakerCone, err := room.GetSpeakerCone(sources[1], 30, 16, goroom.PastelLavender)
 
 	arrivals := []goroom.Arrival{}
 
@@ -251,12 +261,20 @@ func (c SimulateCmd) Run() error {
 		fmt.Println(err)
 	}
 
-	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, nil, arrivals, []goroom.Zone{{
+	paths := append(append([]goroom.PsalmPath{lDirectPath, rDirectPath}, lSpeakerCone...), rSpeakerCone...)
+
+	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, paths, nil, []goroom.Zone{{
 		Center: lt.ListenPosition(),
 		Radius: config.Simulation.RFZRadius,
 	}}); err != nil {
 		return err
 	}
+	// if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, append(lSpeakerCone, rSpeakerCone...), arrivals, []goroom.Zone{{
+	// 	Center: lt.ListenPosition(),
+	// 	Radius: config.Simulation.RFZRadius,
+	// }}); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
