@@ -141,6 +141,64 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 	return shots
 }
 
+// alignWithNormal rotates a vector that was generated assuming Y-up normal
+// to align with the actual normal direction
+func alignWithNormal(dir, normal pt.Vector) pt.Vector {
+	// If normal is already Y-up, no transformation needed
+	yAxis := pt.Vector{X: 0, Y: 1, Z: 0}
+	if normal.Sub(yAxis).Length() < 1e-9 {
+		return dir
+	}
+
+	// Find rotation axis and angle to transform Y-up to normal
+	rotAxis := yAxis.Cross(normal).Normalize()
+	rotAngle := math.Acos(yAxis.Dot(normal))
+
+	// Rotate the direction vector using Rodriguez rotation formula
+	sinTheta := math.Sin(rotAngle)
+	cosTheta := math.Cos(rotAngle)
+
+	// v * cos(θ) + (k × v) * sin(θ) + k * (k · v) * (1 - cos(θ))
+	crossed := rotAxis.Cross(dir).MulScalar(sinTheta)
+	scaled := rotAxis.MulScalar(rotAxis.Dot(dir) * (1 - cosTheta))
+
+	return dir.MulScalar(cosTheta).
+		Add(crossed).
+		Add(scaled)
+}
+
+func (s *Speaker) SampleCone(angleDegrees float64, numRays int) []pt.Ray {
+	rays := make([]pt.Ray, numRays)
+	angleRads := angleDegrees * math.Pi / 180
+
+	// The height of the normalized direction vector along the cone axis
+	h := math.Cos(angleRads)
+	// The radius of the circle formed by the cone at unit distance
+	r := math.Sin(angleRads)
+
+	for i := 0; i < numRays; i++ {
+		// Calculate evenly spaced points around a circle
+		theta := 2 * math.Pi * float64(i) / float64(numRays)
+
+		// Calculate the x and z components of the direction vector
+		x := r * math.Cos(theta)
+		z := r * math.Sin(theta)
+
+		// Create direction vector - this assumes the normal is along Y axis
+		dir := pt.Vector{X: x, Y: h, Z: z}
+
+		// If the normal is not along Y axis, we need to rotate our direction
+		// to align with the speaker's normal direction
+		dir = alignWithNormal(dir, s.NormalDirection)
+
+		rays[i] = pt.Ray{
+			Origin:    s.Position,
+			Direction: dir.Normalize(),
+		}
+	}
+	return rays
+}
+
 type LoudSpeakerSpec struct {
 	Xdim, Ydim, Zdim float64
 	Yoff, Zoff       float64

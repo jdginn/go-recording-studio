@@ -175,3 +175,24 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 	}
 	panic("Code bug")
 }
+
+func (r *Room) GetSpeakerCone(speaker Speaker, angle float64, N int, color string) ([]PsalmPath, error) {
+	paths := make([]PsalmPath, 0, N)
+	rays := speaker.SampleCone(angle, N)
+
+	for _, ray := range rays {
+		hit := r.M.Intersect(ray)
+		if !hit.Ok() {
+			return paths, fmt.Errorf("Nonterminating ray")
+		}
+		paths = append(paths, PsalmPath{
+			Points: []Point{
+				{Position: ray.Origin, Color: color},
+				{Position: hit.HitInfo.Position, Color: color},
+			},
+			Color: color,
+		})
+	}
+
+	return paths, nil
+}
