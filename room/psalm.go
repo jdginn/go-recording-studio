@@ -22,6 +22,20 @@ const (
 	PastelPeach    = "#FFDAC1"
 	PastelMint     = "#B5EAD7"
 	PastelSky      = "#C1E1C1"
+
+	// Bright Colors
+	BrightRed      = "#FF4D4D"
+	BrightOrange   = "#FFA64D"
+	BrightYellow   = "#FFFF4D"
+	BrightGreen    = "#4DFF4D"
+	BrightBlue     = "#4D9EFF"
+	BrightPurple   = "#B64DB6"
+	BrightPink     = "#FF4D93"
+	BrightTeal     = "#4DDBC4"
+	BrightLavender = "#C44DFF"
+	BrightPeach    = "#FFB84D"
+	BrightMint     = "#4DFFD1"
+	BrightSky      = "#4DC4FF"
 )
 
 // JSON schema types
