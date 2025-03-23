@@ -136,8 +136,7 @@ func (c SimulateCmd) Run() error {
 	}
 
 	lt := config.ListeningTriangle.Create()
-
-	fmt.Printf("Listening position is %fm from front wall.\n\n", lt.ListenPosition().X)
+	listenPos, equilateralPos := lt.ListenPosition()
 
 	speakerSpec := config.Speaker.Create()
 
@@ -145,22 +144,21 @@ func (c SimulateCmd) Run() error {
 		goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
 		goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal()),
 	}
-	fmt.Printf("dist_between_monitors: %f, dist_to_equilateral: %f\n\n", lt.LeftSourcePosition().Sub(lt.RightSourcePosition()).Length(), lt.EquilateralPos().Sub(lt.LeftSourcePosition()).Length())
-	fmt.Printf("dist_between_monitors: %f, dist_to_listen_pos: %f\n\n", lt.LeftSourcePosition().Sub(lt.RightSourcePosition()).Length(), lt.ListenPosition().Sub(lt.LeftSourcePosition()).Length())
-	fmt.Printf("dist_into_triangle: %f\n\n", lt.EquilateralPos().Sub(lt.ListenPosition()).Length())
-	fmt.Printf("l_source_pos: %v\n", lt.LeftSourcePosition())
-	fmt.Printf("listen_pos: %v\n", lt.ListenPosition())
-	fmt.Printf("equilateral_pos: %v\n", lt.EquilateralPos())
-	lDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.LeftSourcePosition()}, {Position: lt.EquilateralPos()}}, Color: goroom.BrightRed}
-	rDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.RightSourcePosition()}, {Position: lt.EquilateralPos()}}, Color: goroom.BrightRed}
+
+	lDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.LeftSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed}
+	rDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.RightSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed}
+
+	paths := []goroom.PsalmPath{lDirectPath, rDirectPath}
+
 	lSpeakerCone, err := room.GetSpeakerCone(sources[0], 30, 16, goroom.PastelGreen)
 	rSpeakerCone, err := room.GetSpeakerCone(sources[1], 30, 16, goroom.PastelLavender)
+	paths = append(paths, append(lSpeakerCone, rSpeakerCone...)...)
 
 	arrivals := []goroom.Arrival{}
 
 	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
 		for i, source := range sources {
-			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, lt.ListenPosition())
+			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, listenPos)
 			if !ok {
 				room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 				p1 := goroom.Point{
@@ -211,7 +209,7 @@ func (c SimulateCmd) Run() error {
 	for _, source := range sources {
 		for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
 			totalShots += 1
-			arrival, err := room.TraceShot(shot, lt.ListenPosition(), goroom.TraceParams{
+			arrival, err := room.TraceShot(shot, listenPos, goroom.TraceParams{
 				Order:         config.Simulation.Order,
 				GainThreshold: config.Simulation.GainThresholdDB,
 				TimeThreshold: config.Simulation.TimeThresholdMS * MS,
@@ -222,7 +220,7 @@ func (c SimulateCmd) Run() error {
 					Status: "simulation_error",
 					Errors: []string{err.Error()},
 					Results: goroom.AnalysisResults{
-						ListenPosDist: lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
+						ListenPosDist: listenPos.X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
 					},
 				}); saveErr != nil {
 					return err
@@ -255,26 +253,18 @@ func (c SimulateCmd) Run() error {
 		Results: goroom.AnalysisResults{
 			ITD:              ITD,
 			EnergyOverWindow: energyOverWindow / float64(totalShots),
-			ListenPosDist:    lt.ListenPosition().X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
+			ListenPosDist:    listenPos.X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
 		},
 	}); err != nil {
 		fmt.Println(err)
 	}
 
-	paths := append(append([]goroom.PsalmPath{lDirectPath, rDirectPath}, lSpeakerCone...), rSpeakerCone...)
-
-	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, paths, nil, []goroom.Zone{{
-		Center: lt.ListenPosition(),
+	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, paths, arrivals, []goroom.Zone{{
+		Center: listenPos,
 		Radius: config.Simulation.RFZRadius,
 	}}); err != nil {
 		return err
 	}
-	// if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, append(lSpeakerCone, rSpeakerCone...), arrivals, []goroom.Zone{{
-	// 	Center: lt.ListenPosition(),
-	// 	Radius: config.Simulation.RFZRadius,
-	// }}); err != nil {
-	// 	return err
-	// }
 	return nil
 }
 
