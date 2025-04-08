@@ -93,8 +93,7 @@ type SimulateCmd struct {
 	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
 }
 
-func (c SimulateCmd) Run() error {
-	// Load configuration and room model
+func (c SimulateCmd) Run() (err error) {
 	config, err := roomConfig.LoadFromFile(c.Config, roomConfig.LoadOptions{
 		ValidateImmediately: true,
 		ResolvePaths:        true,
@@ -104,6 +103,7 @@ func (c SimulateCmd) Run() error {
 		return err
 	}
 
+	// Create a directory to store the results of this experiment
 	var expDir *roomExperiment.ExperimentDir
 	if c.OutputDir != "" {
 		expDir, err = roomExperiment.UseExistingExperimentDirectory(c.OutputDir)
@@ -124,6 +124,17 @@ func (c SimulateCmd) Run() error {
 	if err != nil {
 		return err
 	}
+
+	// Whatever happens from here on out, write results to experiment directory
+	defer func() {
+		room.M.SaveSTL(expDir.GetFilePath("room.stl"))
+		if saveErr := summary.WriteToJSON(expDir.GetFilePath("summary.json")); saveErr != nil {
+			err = fmt.Errorf("Error saving summary: %w", saveErr)
+		}
+		if saveErr := annotations.WriteToJSON(expDir.GetFilePath("annotations.json")); saveErr != nil {
+			err = fmt.Errorf("Error writing annotations: %w", saveErr)
+		}
+	}()
 
 	// Compute the position of the speakers as well as the listening position
 	lt := config.ListeningTriangle.Create()
@@ -152,6 +163,7 @@ func (c SimulateCmd) Run() error {
 
 	arrivals := []goroom.Arrival{}
 	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
+		// Check whether the speakers are inside the room
 		for i, source := range sources {
 			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, listenPos)
 			if !ok {
@@ -178,15 +190,8 @@ func (c SimulateCmd) Run() error {
 					return fmt.Errorf("Error writing annotations: %w\n\ttaken after validation error %w", saveErr, err)
 				}
 				summary.AddError(goroom.ErrValidation, fmt.Errorf("speaker_outside_room"))
-				// TODO: would like to find a nicer control flow than this (since this code is duplicated)
-				// Write output to experiment directory
-				room.M.SaveSTL(expDir.GetFilePath("room.stl"))
-				if saveErr := summary.WriteToJSON(expDir.GetFilePath("summary.json")); saveErr != nil {
-					return fmt.Errorf("Error saving summary: %w", saveErr)
-				}
-				if saveErr := annotations.WriteToJSON(expDir.GetFilePath("annotations.json")); saveErr != nil {
-					return fmt.Errorf("Error writing annotations: %w", saveErr)
-				}
+				// Keep in mind, the defer will still write summary and annotations to the experiment directory
+				return nil
 			}
 		}
 	}
@@ -196,6 +201,7 @@ func (c SimulateCmd) Run() error {
 		room.AddWall(lt.RightSourcePosition(), lt.RightSourceNormal(), "Right Speaker Wall", config.GetSurfaceAssignment("Right Speaker Wall"))
 	}
 
+	// TODO: remove this hard-code-y hack and replace with something more principled
 	addCeilingAbsorbers(room, lt, *config)
 
 	var totalShots int
