@@ -19,11 +19,6 @@ const MS float64 = 1.0 / 1000.0
 
 const SCALE float64 = 100
 
-// var kh310_directivity = goroom.NewDirectivity(
-// 	map[float64]float64{0: 0, 30: -0, 40: -1, 50: -2, 60: -3, 70: -4, 80: -6, 90: -7, 100: -8, 120: -11, 150: -20, 160: -50},
-// 	map[float64]float64{0: 0, 30: -4, 60: -6, 70: -10, 80: -12, 100: -13, 120: -15},
-// )
-
 func saveImage(filename string, i image.Image) error {
 	f, err := os.Create("out1.png")
 	if err != nil {
