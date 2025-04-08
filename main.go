@@ -2,10 +2,7 @@ package main
 
 import (
 	"fmt"
-	"image"
-	"image/png"
 	"log"
-	"os"
 	"sort"
 
 	"github.com/alecthomas/kong"
@@ -18,15 +15,6 @@ import (
 const MS float64 = 1.0 / 1000.0
 
 const SCALE float64 = 100
-
-func saveImage(filename string, i image.Image) error {
-	f, err := os.Create("out1.png")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return png.Encode(f, i)
-}
 
 func addCeilingAbsorbers(r *goroom.Room, lt goroom.ListeningTriangle, config roomConfig.ExperimentConfig) error {
 	center := config.CeilingPanels.Center
