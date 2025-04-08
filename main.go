@@ -91,6 +91,7 @@ type SimulateCmd struct {
 	OutputDir              string `arg:"" optional:"" name:"output-dir" help:"directory to store output in"`
 	SkipSpeakerInRoomCheck bool   `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
 	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
+	SkipTracing            bool   `name:"skip-tracing" help:"don't perform any of the tracing steps"`
 }
 
 func (c SimulateCmd) Run() (err error) {
@@ -161,7 +162,6 @@ func (c SimulateCmd) Run() (err error) {
 	rSpeakerCone, err := room.GetSpeakerCone(sources[1], 30, 16, goroom.PastelLavender)
 	paths = append(paths, append(lSpeakerCone, rSpeakerCone...)...)
 
-	arrivals := []goroom.Arrival{}
 	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
 		// Check whether the speakers are inside the room
 		for i, source := range sources {
@@ -204,39 +204,45 @@ func (c SimulateCmd) Run() (err error) {
 	// TODO: remove this hard-code-y hack and replace with something more principled
 	addCeilingAbsorbers(room, lt, *config)
 
-	var totalShots int
-	for _, source := range sources {
-		for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
-			totalShots += 1
-			arrival, err := room.TraceShot(shot, listenPos, goroom.TraceParams{
-				Order:         config.Simulation.Order,
-				GainThreshold: config.Simulation.GainThresholdDB,
-				TimeThreshold: config.Simulation.TimeThresholdMS * MS,
-				RFZRadius:     config.Simulation.RFZRadius,
-			})
-			if err != nil {
-				summary.AddError(goroom.ErrSimulation, err)
+	if !c.SkipTracing {
+		var totalShots int
+		// Simulate reflections
+		arrivals := []goroom.Arrival{}
+		for _, source := range sources {
+			for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
+				totalShots += 1
+				arrival, err := room.TraceShot(shot, listenPos, goroom.TraceParams{
+					Order:         config.Simulation.Order,
+					GainThreshold: config.Simulation.GainThresholdDB,
+					TimeThreshold: config.Simulation.TimeThresholdMS * MS,
+					RFZRadius:     config.Simulation.RFZRadius,
+				})
+				if err != nil {
+					summary.AddError(goroom.ErrSimulation, err)
+					return err
+				}
+				arrivals = append(arrivals, arrival...)
 			}
-			arrivals = append(arrivals, arrival...)
 		}
-	}
-	sort.Slice(arrivals, func(i int, j int) bool {
-		return arrivals[i].Distance < arrivals[j].Distance
-	})
-	annotations.Arrivals = arrivals
+		sort.Slice(arrivals, func(i int, j int) bool {
+			return arrivals[i].Distance < arrivals[j].Distance
+		})
+		summary.Results.ITD = arrivals[0].ITD()
+		annotations.Arrivals = arrivals
 
-	var ITD float64
-	if len(arrivals) > 0 {
-		ITD = arrivals[0].ITD()
-	} else {
-		ITD = config.Simulation.TimeThresholdMS
+		var ITD float64
+		if len(arrivals) > 0 {
+			ITD = arrivals[0].ITD()
+		} else {
+			ITD = config.Simulation.TimeThresholdMS
+		}
+		summary.Results.ITD = ITD
+		energyOverWindow, err := goroom.EnergyOverWindow(arrivals, 25, -15)
+		if err != nil {
+			print(err)
+		}
+		summary.Results.EnergyOverWindow = energyOverWindow / float64(totalShots)
 	}
-	summary.Results.ITD = ITD
-	energyOverWindow, err := goroom.EnergyOverWindow(arrivals, 25, -15)
-	if err != nil {
-		print(err)
-	}
-	summary.Results.EnergyOverWindow = energyOverWindow / float64(totalShots)
 
 	// Write output to experiment directory
 	room.M.SaveSTL(expDir.GetFilePath("room.stl"))
