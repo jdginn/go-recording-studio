@@ -14,6 +14,9 @@ The JSON file must be a dictionary with the following structure:
     "ITD"?: number,
     "ITD_2"?: number,
     "avg_gain_5ms"?: number
+    "listen_pos_dist"?: number
+    "T60_sabine"?: number
+    "schroeder_freq"?: number
   }
 }
 ```
@@ -43,6 +46,8 @@ The JSON file must be a dictionary with the following structure:
 - `ITD_2` (number): Secondary Initial Time Delay measurement in milliseconds. This figure measures ITD for an alternate, configurable RFZ. This RFZ may be a subset or superset of the primary RFZ.
 - `avg_gain_5ms` (number): Average gain of reflections over 5ms window following ITD
 - `listen_pos_dist` (number): Distance from the listening position from the front wall in meters
+- `T60_sabine` (number): Sabine T60 decay figure, in seconds
+- `schroeder_freq` (number): Schroeder frequency in hertz
 
 ## Example
 
@@ -54,6 +59,8 @@ The JSON file must be a dictionary with the following structure:
     "ITD_2": 0.20
     "avg_gain_5ms": -6.5
     "listen_pos_dist": 1.4
+    "t60_sabine": 0.3
+    "schroeder_freq": 350
   }
 }
 ```
