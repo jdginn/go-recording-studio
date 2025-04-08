@@ -106,6 +106,7 @@ type SimulateCmd struct {
 }
 
 func (c SimulateCmd) Run() error {
+	// Load configuration and room model
 	config, err := roomConfig.LoadFromFile(c.Config, roomConfig.LoadOptions{
 		ValidateImmediately: true,
 		ResolvePaths:        true,
@@ -125,16 +126,28 @@ func (c SimulateCmd) Run() error {
 		return fmt.Errorf("copying config file: %w", err)
 	}
 
-	room, surfaces, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
+	// Initialize output data structures
+	//
+	// We will accumulate results into these structures as we compute them
+	annotations := goroom.NewAnnotations()
+	summary := goroom.NewSummary()
+
+	room, _, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
 	if err != nil {
 		return err
 	}
 
+	// Compute the position of the speakers as well as the listening position
 	lt := config.ListeningTriangle.Create()
 	listenPos, equilateralPos := lt.ListenPosition()
+	summary.Results.ListenPosDist = listenPos.X // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along the X axis
+	annotations.Zones = append(annotations.Zones, goroom.Zone{
+		Center: listenPos,
+		Radius: config.Simulation.RFZRadius,
+	})
 
+	// Create the speakers
 	speakerSpec := config.Speaker.Create()
-
 	sources := []goroom.Speaker{
 		goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
 		goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal()),
@@ -150,7 +163,6 @@ func (c SimulateCmd) Run() error {
 	paths = append(paths, append(lSpeakerCone, rSpeakerCone...)...)
 
 	arrivals := []goroom.Arrival{}
-
 	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
 		for i, source := range sources {
 			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, listenPos)
@@ -166,23 +178,27 @@ func (c SimulateCmd) Run() error {
 					Color:    goroom.PastelRed,
 					Name:     fmt.Sprintf("source_%d_bad_intersection", i),
 				}
-				if err := goroom.SaveAnnotationsToJson("annotations.json", []goroom.Point{p1, p2}, []goroom.PsalmPath{
-					{
+				annotations.Points = append(annotations.Points, p1, p2)
+				annotations.Paths = append(annotations.Paths,
+					goroom.PsalmPath{
 						Points:    []goroom.Point{p1, p2},
 						Name:      "",
 						Color:     goroom.PastelRed,
 						Thickness: 0,
-					},
-				}, nil, nil); err != nil {
-					return err
+					})
+				if saveErr := annotations.WriteToJSON("annotations.json"); err != nil {
+					return fmt.Errorf("Error writing annotations: %w\n\ttaken after validation error %w", saveErr, err)
 				}
-
-				goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
-					Status:  "validation_error",
-					Errors:  []string{"speaker_outside_room"},
-					Results: goroom.AnalysisResults{},
-				})
-				return nil
+				summary.AddError(goroom.ErrValidation, fmt.Errorf("speaker_outside_room"))
+				// TODO: would like to find a nicer control flow than this (since this code is duplicated)
+				// Write output to experiment directory
+				room.M.SaveSTL(expDir.GetFilePath("room.stl"))
+				if saveErr := summary.WriteToJSON(expDir.GetFilePath("summary.json")); saveErr != nil {
+					return fmt.Errorf("Error saving summary: %w", saveErr)
+				}
+				if saveErr := annotations.WriteToJSON(expDir.GetFilePath("annotations.json")); saveErr != nil {
+					return fmt.Errorf("Error writing annotations: %w", saveErr)
+				}
 			}
 		}
 	}
@@ -194,13 +210,7 @@ func (c SimulateCmd) Run() error {
 
 	addCeilingAbsorbers(room, lt, *config)
 
-	for name, height := range config.WallAbsorbers.Heights {
-		room.AddSurface(surfaces[name].Absorber(config.WallAbsorbers.Thickness, height, goroom.Material{
-			Alpha: 0.9,
-		}))
-	}
-
-	totalShots := 0
+	var totalShots int
 	for _, source := range sources {
 		for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
 			totalShots += 1
@@ -211,24 +221,15 @@ func (c SimulateCmd) Run() error {
 				RFZRadius:     config.Simulation.RFZRadius,
 			})
 			if err != nil {
-				if saveErr := goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
-					Status: "simulation_error",
-					Errors: []string{err.Error()},
-					Results: goroom.AnalysisResults{
-						ListenPosDist: listenPos.X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
-					},
-				}); saveErr != nil {
-					return err
-				}
-				return err
+				summary.AddError(goroom.ErrSimulation, err)
 			}
 			arrivals = append(arrivals, arrival...)
 		}
 	}
-
 	sort.Slice(arrivals, func(i int, j int) bool {
 		return arrivals[i].Distance < arrivals[j].Distance
 	})
+	annotations.Arrivals = arrivals
 
 	var ITD float64
 	if len(arrivals) > 0 {
@@ -236,30 +237,22 @@ func (c SimulateCmd) Run() error {
 	} else {
 		ITD = config.Simulation.TimeThresholdMS
 	}
+	summary.Results.ITD = ITD
 	energyOverWindow, err := goroom.EnergyOverWindow(arrivals, 25, -15)
 	if err != nil {
 		print(err)
 	}
+	summary.Results.EnergyOverWindow = energyOverWindow / float64(totalShots)
 
+	// Write output to experiment directory
 	room.M.SaveSTL(expDir.GetFilePath("room.stl"))
-
-	if err := goroom.SaveResultsSummaryToJSON(expDir.GetFilePath("summary.json"), goroom.ResultsSummary{
-		Status: "success",
-		Results: goroom.AnalysisResults{
-			ITD:              ITD,
-			EnergyOverWindow: energyOverWindow / float64(totalShots),
-			ListenPosDist:    listenPos.X, // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along he X axis
-		},
-	}); err != nil {
-		fmt.Println(err)
+	if saveErr := summary.WriteToJSON(expDir.GetFilePath("summary.json")); saveErr != nil {
+		return fmt.Errorf("Error saving summary: %w", saveErr)
+	}
+	if saveErr := annotations.WriteToJSON(expDir.GetFilePath("annotations.json")); saveErr != nil {
+		return fmt.Errorf("Error writing annotations: %w", saveErr)
 	}
 
-	if err := goroom.SaveAnnotationsToJson(expDir.GetFilePath("annotations.json"), nil, paths, arrivals, []goroom.Zone{{
-		Center: listenPos,
-		Radius: config.Simulation.RFZRadius,
-	}}); err != nil {
-		return err
-	}
 	return nil
 }
 

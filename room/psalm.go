@@ -221,39 +221,55 @@ type Point struct {
 	Color    string
 }
 
+type Annotations struct {
+	Points   []Point
+	Paths    []PsalmPath
+	Arrivals []Arrival
+	Zones    []Zone
+}
+
+func NewAnnotations() *Annotations {
+	return &Annotations{
+		Points:   []Point{},
+		Paths:    []PsalmPath{},
+		Arrivals: []Arrival{},
+		Zones:    []Zone{},
+	}
+}
+
 // SaveAnnotationsToJson saves points, paths, and both types of paths to a JSON file
-func SaveAnnotationsToJson(filename string, points []Point, paths []PsalmPath, arrivals []Arrival, zones []Zone) error {
+func (a Annotations) WriteToJSON(filename string) error {
 	container := struct {
 		Points        []PointJSON        `json:"points,omitempty"`
 		Paths         []PathJSON         `json:"paths,omitempty"`
 		AcousticPaths []AcousticPathJSON `json:"acousticPaths,omitempty"`
 		Zones         []ZoneJSON         `json:"zones,omitempty"`
 	}{
-		Points:        make([]PointJSON, len(points)),
-		Paths:         make([]PathJSON, len(paths)),
-		AcousticPaths: make([]AcousticPathJSON, 0, len(arrivals)),
-		Zones:         make([]ZoneJSON, 0, len(zones)),
+		Points:        make([]PointJSON, len(a.Points)),
+		Paths:         make([]PathJSON, len(a.Paths)),
+		AcousticPaths: make([]AcousticPathJSON, 0, len(a.Arrivals)),
+		Zones:         make([]ZoneJSON, 0, len(a.Zones)),
 	}
 
 	// Convert points
-	for i, p := range points {
+	for i, p := range a.Points {
 		container.Points[i] = PointToJSON(p)
 	}
 
 	// Convert paths
-	for i, path := range paths {
+	for i, path := range a.Paths {
 		container.Paths[i] = PathToJSON(path)
 	}
 
 	// Convert arrivals to acoustic paths
-	for _, arrival := range arrivals {
+	for _, arrival := range a.Arrivals {
 		if arrival.Distance != INF {
 			container.AcousticPaths = append(container.AcousticPaths, ArrivalToAcousticPathJSON(arrival))
 		}
 	}
 
 	// Convert zones
-	for _, z := range zones {
+	for _, z := range a.Zones {
 		container.Zones = append(container.Zones, ZoneToJSON(z))
 	}
 
@@ -265,11 +281,44 @@ func SaveAnnotationsToJson(filename string, points []Point, paths []PsalmPath, a
 	return os.WriteFile(filename, data, 0644)
 }
 
+type Status string
+
+const (
+	NoErr         Status = "success"
+	ErrValidation Status = "validation_error"
+	ErrSimulation Status = "simulation_error"
+)
+
 // Summary Results Schema
-type ResultsSummary struct {
-	Status  string          `json:"status"`
+type Summary struct {
+	Status  Status          `json:"status"`
 	Errors  []string        `json:"errors,omitempty"`
 	Results AnalysisResults `json:"results"`
+}
+
+func NewSummary() *Summary {
+	return &Summary{
+		Status:  "unknown",
+		Errors:  []string{},
+		Results: AnalysisResults{},
+	}
+}
+
+func (r *Summary) AddError(status Status, err error) {
+	// validation_error trumps simulation_error
+	if r.Status != ErrValidation {
+		r.Status = status
+	}
+	r.Errors = append(r.Errors, err.Error())
+}
+
+func (r Summary) WriteToJSON(filename string) error {
+	data, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshaling summary results: %w", err)
+	}
+
+	return os.WriteFile(filename, data, 0644)
 }
 
 type AnalysisResults struct {
@@ -278,13 +327,4 @@ type AnalysisResults struct {
 	ITD2             float64 `json:"ITD_2,omitempty"`
 	AvgGain5ms       float64 `json:"avg_gain_5ms,omitempty"`
 	ListenPosDist    float64 `json:"listen_pos_dist,omitempty"`
-}
-
-func SaveResultsSummaryToJSON(filename string, results ResultsSummary) error {
-	data, err := json.MarshalIndent(results, "", "  ")
-	if err != nil {
-		return fmt.Errorf("error marshaling summary results: %w", err)
-	}
-
-	return os.WriteFile(filename, data, 0644)
 }
