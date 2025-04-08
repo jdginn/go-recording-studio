@@ -1,6 +1,8 @@
 package room
 
 import (
+	"math"
+
 	"github.com/fogleman/pt/pt"
 	"github.com/hpinc/go3mf"
 )
@@ -275,4 +277,129 @@ func (r *Room) AddSurface(surface *Surface) error {
 	r.M.Compile()
 
 	return nil
+}
+
+// Function to count intersections between a ray and the mesh
+func countIntersections(ray pt.Ray, mesh *pt.Mesh) int {
+	count := 0
+	for _, triangle := range mesh.Triangles {
+		hit := triangle.Intersect(ray)
+		if hit.Ok() {
+			count++
+		}
+	}
+	return count
+}
+
+// Function to calculate the centroid of a triangle
+func triangleCentroid(triangle pt.TriangleInt) pt.Vector {
+	tri := triangle.T()
+	return pt.Vector{
+		X: (tri.V1.X + tri.V2.X + tri.V3.X) / 3,
+		Y: (tri.V1.Y + tri.V2.Y + tri.V3.Y) / 3,
+		Z: (tri.V1.Z + tri.V2.Z + tri.V3.Z) / 3,
+	}
+}
+
+// Check if a triangle is inside the mesh
+func isTriangleInside(triangle pt.TriangleInt, mesh *pt.Mesh) bool {
+	centroid := triangleCentroid(triangle)
+	ray := pt.Ray{
+		Origin:    centroid,
+		Direction: pt.Vector{X: 1, Y: 0, Z: 0}, // Cast ray in +X direction
+	}
+	return countIntersections(ray, mesh)%2 == 1
+}
+
+// InteriorMesh returns the mesh describing the innermost set of walls in the room
+func (r *Room) InteriorMesh() (*pt.Mesh, error) {
+	newTriangles := []pt.TriangleInt{}
+
+	for _, tri := range r.M.Triangles {
+		if isTriangleInside(tri, r.M) {
+			newTriangles = append(newTriangles, tri)
+		}
+	}
+
+	return pt.NewMesh(newTriangles), nil
+}
+
+// ComputeMeshVolume calculates the volume of a closed mesh
+// Note: The mesh must be closed and properly oriented (consistent winding order)
+// Returns: Volume in cubic units of the mesh coordinates
+func ComputeMeshVolume(mesh *pt.Mesh) float64 {
+	volume := 0.0
+
+	// For each triangle in the mesh
+	for _, triangle := range mesh.Triangles {
+		triangle := triangle.T()
+		// Compute the signed volume of tetrahedron formed by triangle and origin
+		v321 := triangle.V3.X * triangle.V2.Y * triangle.V1.Z
+		v231 := triangle.V2.X * triangle.V3.Y * triangle.V1.Z
+		v312 := triangle.V3.X * triangle.V1.Y * triangle.V2.Z
+		v132 := triangle.V1.X * triangle.V3.Y * triangle.V2.Z
+		v213 := triangle.V2.X * triangle.V1.Y * triangle.V3.Z
+		v123 := triangle.V1.X * triangle.V2.Y * triangle.V3.Z
+
+		signedVolume := (-v321 + v231 + v312 - v132 - v213 + v123) / 6.0
+		volume += signedVolume
+	}
+
+	return math.Abs(volume)
+}
+
+// SurfaceArea returns the surface area of the INTERIOR of the room
+func (r *Room) SurfaceArea() (float64, error) {
+	area := 0.0
+	interiorMesh, err := r.InteriorMesh()
+	if err != nil {
+		return 0, err
+	}
+	for _, tri := range interiorMesh.Triangles {
+		tri := tri.T()
+		area += tri.Area()
+	}
+	return area, nil
+}
+
+// Volume returns the volume of the INTERIOR of the room
+func (r *Room) Volume() (float64, error) {
+	// interior, err := r.InteriorMesh()
+	// if err != nil {
+	// 	return 0, err
+	// }
+	interior := r.M
+	return ComputeMeshVolume(interior), nil
+}
+
+const (
+	SABINE          = 0.161
+	EYERING         = 55.3
+	SCHROEDER_COEFF = 2000
+)
+
+// T60Sabine returns the Sabine reverberation time of the room in seconds
+func (r *Room) T60Sabine() (float64, error) {
+	sabines := 0.0
+	for _, tri := range r.M.Triangles {
+		sabines += tri.(*Triangle).Surface.Material.Alpha * tri.T().Area()
+	}
+	v, err := r.Volume()
+	if err != nil {
+		return 0, err
+	}
+	return SABINE * v / sabines, nil
+}
+
+// SchroederFreq returns the Schroeder frequency of the room, which is the frequency at which the reverb transitions from modal to specular behavior
+func (r *Room) SchroederFreq() (float64, error) {
+	rt60, err := r.T60Sabine()
+	if err != nil {
+		return 0, err
+	}
+	volume, err := r.Volume()
+	if err != nil {
+		return 0, err
+	}
+	return SCHROEDER_COEFF * math.Sqrt(rt60/volume), nil
 }

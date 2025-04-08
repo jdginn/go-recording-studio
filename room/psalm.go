@@ -327,4 +327,6 @@ type AnalysisResults struct {
 	ITD2             float64 `json:"ITD_2,omitempty"`
 	AvgGain5ms       float64 `json:"avg_gain_5ms,omitempty"`
 	ListenPosDist    float64 `json:"listen_pos_dist,omitempty"`
+	T60Sabine        float64 `json:"T60_sabine,omitempty"`
+	SchroederFreq    float64 `json:"schroeder_freq,omitempty"`
 }

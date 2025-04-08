@@ -137,6 +137,18 @@ func (c SimulateCmd) Run() (err error) {
 		}
 	}()
 
+	// Calculate decay characteristics that can be known without the listening position
+	t60Sabine, err := room.T60Sabine()
+	if err != nil {
+		return err
+	}
+	summary.Results.T60Sabine = t60Sabine
+	schroederFreq, err := room.SchroederFreq()
+	if err != nil {
+		return err
+	}
+	summary.Results.SchroederFreq = schroederFreq
+
 	// Compute the position of the speakers as well as the listening position
 	lt := config.ListeningTriangle.Create()
 	listenPos, equilateralPos := lt.ListenPosition()
