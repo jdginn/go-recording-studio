@@ -30,9 +30,7 @@ func (c ExperimentConfig) SurfaceAssignmentMap() map[string]room.Material {
 		if _, ok := c.Materials.Inline[material]; !ok {
 			panic(fmt.Sprintf("code bug: should be looking up default material but failed to find %s", material))
 		}
-		assignmentMap[name] = room.Material{
-			Alpha: c.Materials.Inline[material].Absorption,
-		}
+		assignmentMap[name] = room.NewMaterial(c.Materials.Inline[material].Absorption)
 	}
 
 	return assignmentMap
@@ -43,7 +41,7 @@ func (c ExperimentConfig) GetSurfaceAssignment(name string) room.Material {
 	if !ok {
 		mat = c.Materials.Inline["default"]
 	}
-	return room.Material{Alpha: mat.Absorption}
+	return room.NewMaterial(mat.Absorption)
 }
 
 type Metadata struct {
@@ -63,7 +61,7 @@ type Materials struct {
 }
 
 type Material struct {
-	Absorption float64 `yaml:"absorption"`
+	Absorption map[float64]float64 `yaml:"absorption"`
 }
 
 type SurfaceAssignments struct {

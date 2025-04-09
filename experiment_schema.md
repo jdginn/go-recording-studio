@@ -62,7 +62,7 @@ Defines acoustic properties of materials used in the simulation. Materials can b
 
 - Either `inline` or `from_file` must be specified:
   - `inline` (map): Dictionary of material definitions, where each material has:
-    - `absorption` (float): Absorption coefficient between 0.0 and 1.0
+    - `absorption` (map): Map of absorption coefficients at specific frequencies where the absorption coefficient is between 0.0 (perfect reflector) and 1.0 (perfect absorber).
   - `from_file` (string): Path to JSON file containing material definitions
 
 If both are specified, the contents of `inline` and `from_file` are merged with the values in `inline` taking precedence.
@@ -73,9 +73,11 @@ Example:
 materials:
   inline:
     brick:
-      absorption: 0.04
+      absorption:
+        { 125: 0.05, 250: 0.04, 500: 0.02, 1000: 0.04, 2000: 0.05, 4000: 0.05 }
     wood:
-      absorption: 0.10
+      absorption:
+        { 125: 0.25, 250: 0.05, 500: 0.04, 1000: 0.03, 2000: 0.03, 4000: 0.02 }
   # AND/OR
   from_file: "path/to/materials.json"
 ```

@@ -2,13 +2,49 @@ package room
 
 import (
 	"math"
+	"sort"
 
 	"github.com/fogleman/pt/pt"
 	"github.com/hpinc/go3mf"
+	lin "github.com/sgreben/piecewiselinear"
 )
 
 type Material struct {
-	Alpha float64
+	alphaFunc lin.Function
+	alphaMap  map[float64]float64 // For now, we only use this for serializing materials to json
+}
+
+func NewMaterial(alphaMap map[float64]float64) Material {
+	// Create a slice of freq-alpha pairs
+	pairs := make([][2]float64, 0, len(alphaMap))
+	for freq, alpha := range alphaMap {
+		pairs = append(pairs, [2]float64{freq, alpha})
+	}
+
+	// Sort pairs by frequency
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i][0] < pairs[j][0]
+	})
+
+	// Create sorted slices
+	freqs := make([]float64, len(pairs))
+	alphas := make([]float64, len(pairs))
+	for i, pair := range pairs {
+		freqs[i] = pair[0]  // frequency
+		alphas[i] = pair[1] // alpha
+	}
+
+	return Material{
+		alphaFunc: lin.Function{
+			X: freqs,
+			Y: alphas,
+		},
+		alphaMap: alphaMap,
+	}
+}
+
+func (m Material) Alpha(freq float64) float64 {
+	return m.alphaFunc.At(freq)
 }
 
 type Surface struct {
@@ -130,7 +166,8 @@ func NewFrom3MF(filepath string, materials map[string]Material) (*Room, map[stri
 	surfaces := make(map[string]*Surface)
 
 	if _, ok := materials["default"]; !ok {
-		materials["default"] = Material{0.2}
+		// Sane default absorption for brick
+		materials["default"] = NewMaterial(map[float64]float64{125: 0.05, 250: 0.04, 500: 0.02, 1000: 0.04, 2000: 0.05, 4000: 0.05})
 	}
 
 	var model go3mf.Model
@@ -379,10 +416,10 @@ const (
 )
 
 // T60Sabine returns the Sabine reverberation time of the room in seconds
-func (r *Room) T60Sabine() (float64, error) {
+func (r *Room) T60Sabine(freq float64) (float64, error) {
 	sabines := 0.0
 	for _, tri := range r.M.Triangles {
-		sabines += tri.(*Triangle).Surface.Material.Alpha * tri.T().Area()
+		sabines += tri.(*Triangle).Surface.Material.Alpha(freq) * tri.T().Area()
 	}
 	v, err := r.Volume()
 	if err != nil {
@@ -393,7 +430,8 @@ func (r *Room) T60Sabine() (float64, error) {
 
 // SchroederFreq returns the Schroeder frequency of the room, which is the frequency at which the reverb transitions from modal to specular behavior
 func (r *Room) SchroederFreq() (float64, error) {
-	rt60, err := r.T60Sabine()
+	// 250Hz is a reasonable starting point since the Schroeder frequency is usually in that ballpark
+	rt60, err := r.T60Sabine(250)
 	if err != nil {
 		return 0, err
 	}
