@@ -428,6 +428,23 @@ func (r *Room) T60Sabine(freq float64) (float64, error) {
 	return SABINE * v / sabines, nil
 }
 
+func (r *Room) T60Eyring(freq float64) (float64, error) {
+	sabines := 0.0
+	for _, tri := range r.M.Triangles {
+		sabines += tri.(*Triangle).Surface.Material.Alpha(freq) * tri.T().Area()
+	}
+	surfaceArea, err := r.SurfaceArea()
+	if err != nil {
+		return 0, err
+	}
+	volume, err := r.Volume()
+	if err != nil {
+		return 0, err
+	}
+	avgAbsorpCoeff := sabines / surfaceArea
+	return EYERING * volume / (-SPEED_OF_SOUND * surfaceArea * math.Log(1-avgAbsorpCoeff)), nil
+}
+
 // SchroederFreq returns the Schroeder frequency of the room, which is the frequency at which the reverb transitions from modal to specular behavior
 func (r *Room) SchroederFreq() (float64, error) {
 	// 250Hz is a reasonable starting point since the Schroeder frequency is usually in that ballpark
