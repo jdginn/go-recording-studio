@@ -35,8 +35,7 @@ func addCeilingAbsorbers(r *goroom.Room, lt goroom.ListeningTriangle, config roo
 				Max: center.Height + center.Thickness,
 			},
 			"Center Ceiling Absorber",
-			goroom.Material{Alpha: 0.9999},
-			// config.GetSurfaceAssignment("Center Ceiling Absorber"),
+			config.GetSurfaceAssignment("Center Ceiling Absorber"),
 		)
 	}
 
@@ -57,8 +56,7 @@ func addCeilingAbsorbers(r *goroom.Room, lt goroom.ListeningTriangle, config roo
 				Max: sides.Height + center.Thickness,
 			},
 			"Left Ceiling Absorber",
-			goroom.Material{Alpha: 0.999},
-			// config.GetSurfaceAssignment("Left Ceiling Absorber"),
+			config.GetSurfaceAssignment("Left Ceiling Absorber"),
 		)
 		r.AddPrism(
 			goroom.Bounds{
@@ -74,8 +72,7 @@ func addCeilingAbsorbers(r *goroom.Room, lt goroom.ListeningTriangle, config roo
 				Max: sides.Height + center.Thickness,
 			},
 			"Right Ceiling Absorber",
-			goroom.Material{Alpha: 0.999},
-			// config.GetSurfaceAssignment("Right Ceiling Absorber"),
+			config.GetSurfaceAssignment("Right Ceiling Absorber"),
 		)
 	}
 
@@ -138,7 +135,7 @@ func (c SimulateCmd) Run() (err error) {
 	}()
 
 	// Calculate decay characteristics that can be known without the listening position
-	t60Sabine, err := room.T60Sabine()
+	t60Sabine, err := room.T60Sabine(150)
 	if err != nil {
 		return err
 	}

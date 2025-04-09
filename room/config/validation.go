@@ -125,11 +125,13 @@ func (m *Materials) Validate() []ValidationError {
 
 	// Validate inline materials if present
 	for name, material := range m.Inline {
-		if material.Absorption < 0 || material.Absorption > 1 {
-			errors = append(errors, ValidationError{
-				Field:   fmt.Sprintf("materials.inline.%s.absorption", name),
-				Message: "absorption coefficient must be between 0.0 and 1.0",
-			})
+		for _, alpha := range material.Absorption {
+			if alpha < 0 || alpha > 1 {
+				errors = append(errors, ValidationError{
+					Field:   fmt.Sprintf("materials.inline.%s.absorption", name),
+					Message: "absorption coefficient must be between 0.0 and 1.0",
+				})
+			}
 		}
 	}
 

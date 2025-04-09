@@ -54,12 +54,23 @@ type PointJSON struct {
 }
 
 type MaterialJSON struct {
-	Absorption float64 `json:"absorption"`
+	Absorption map[float64]float64 `json:"absorption"`
+}
+
+// MarshalJSON implements custom JSON marshaling
+func (m *MaterialJSON) MarshalJSON() ([]byte, error) {
+	// Create a temporary struct with string keys
+	stringMap := make(map[string]float64)
+	for k, v := range m.Absorption {
+		stringMap[fmt.Sprintf("%.2f", k)] = v
+	}
+
+	return json.Marshal(stringMap)
 }
 
 func MaterialToJSON(m Material) MaterialJSON {
 	return MaterialJSON{
-		Absorption: m.Alpha,
+		Absorption: m.alphaMap,
 	}
 }
 
