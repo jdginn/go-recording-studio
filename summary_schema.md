@@ -16,6 +16,7 @@ The JSON file must be a dictionary with the following structure:
     "avg_gain_5ms"?: number
     "listen_pos_dist"?: number
     "T60_sabine"?: number
+    "T60_eyering"?: number
     "schroeder_freq"?: number
   }
 }
@@ -47,6 +48,7 @@ The JSON file must be a dictionary with the following structure:
 - `avg_gain_5ms` (number): Average gain of reflections over 5ms window following ITD
 - `listen_pos_dist` (number): Distance from the listening position from the front wall in meters
 - `T60_sabine` (number): Sabine T60 decay figure, in seconds
+- `T60_eyering` (number): Sabine T60 decay figure, in seconds
 - `schroeder_freq` (number): Schroeder frequency in hertz
 
 ## Example
@@ -59,7 +61,8 @@ The JSON file must be a dictionary with the following structure:
     "ITD_2": 0.20
     "avg_gain_5ms": -6.5
     "listen_pos_dist": 1.4
-    "t60_sabine": 0.3
+    "T60_sabine": 0.3
+    "T60_eyering": 0.3
     "schroeder_freq": 350
   }
 }
