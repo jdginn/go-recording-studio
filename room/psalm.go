@@ -233,18 +233,20 @@ type Point struct {
 }
 
 type Annotations struct {
-	Points   []Point
-	Paths    []PsalmPath
-	Arrivals []Arrival
-	Zones    []Zone
+	Points     []Point
+	Paths      []PsalmPath
+	Arrivals   []Arrival
+	Zones      []Zone
+	PathColors map[int]string // This is ugly but yolo
 }
 
 func NewAnnotations() *Annotations {
 	return &Annotations{
-		Points:   []Point{},
-		Paths:    []PsalmPath{},
-		Arrivals: []Arrival{},
-		Zones:    []Zone{},
+		Points:     []Point{},
+		Paths:      []PsalmPath{},
+		Arrivals:   []Arrival{},
+		Zones:      []Zone{},
+		PathColors: map[int]string{},
 	}
 }
 
@@ -273,9 +275,16 @@ func (a Annotations) WriteToJSON(filename string) error {
 	}
 
 	// Convert arrivals to acoustic paths
-	for _, arrival := range a.Arrivals {
+	for i, arrival := range a.Arrivals {
 		if arrival.Distance != INF {
-			container.AcousticPaths = append(container.AcousticPaths, ArrivalToAcousticPathJSON(arrival))
+			acousticPath := ArrivalToAcousticPathJSON(arrival)
+			if a.PathColors != nil {
+				color, ok := a.PathColors[i]
+				if ok {
+					acousticPath.Color = color
+				}
+			}
+			container.AcousticPaths = append(container.AcousticPaths, acousticPath)
 		}
 	}
 
