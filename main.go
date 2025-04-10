@@ -140,6 +140,11 @@ func (c SimulateCmd) Run() (err error) {
 		return err
 	}
 	summary.Results.T60Sabine = t60Sabine
+	t60Eyering, err := room.T60Eyring(150)
+	if err != nil {
+		return err
+	}
+	summary.Results.T60Eyering = t60Eyering
 	schroederFreq, err := room.SchroederFreq()
 	if err != nil {
 		return err
@@ -211,7 +216,7 @@ func (c SimulateCmd) Run() (err error) {
 	}
 
 	// TODO: remove this hard-code-y hack and replace with something more principled
-	addCeilingAbsorbers(room, lt, *config)
+	// addCeilingAbsorbers(room, lt, *config)
 
 	if !c.SkipTracing {
 		var totalShots int
