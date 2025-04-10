@@ -89,6 +89,7 @@ type SimulateCmd struct {
 	SkipSpeakerInRoomCheck bool   `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
 	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
 	SkipTracing            bool   `name:"skip-tracing" help:"don't perform any of the tracing steps"`
+	Counterfactual         string `name:"counterfactual" help:"simulate reflections that *would* arrive at the listening position if the given surface were a perfect reflector"`
 }
 
 func (c SimulateCmd) Run() (err error) {
@@ -242,6 +243,80 @@ func (c SimulateCmd) Run() (err error) {
 			return arrivals[i].Distance < arrivals[j].Distance
 		})
 		summary.Results.ITD = arrivals[0].ITD()
+
+		if c.Counterfactual == "" {
+			annotations.Arrivals = arrivals
+		}
+
+		if c.Counterfactual != "" {
+			surfaceMap := config.SurfaceAssignmentMap()
+			if c.Counterfactual != "" {
+				surfaceMap[c.Counterfactual] = goroom.PerfectReflector()
+			}
+			cfRoom, _, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
+			if err != nil {
+				return err
+			}
+
+			// Simulate reflections AS IF the counterfactual surface were a perfect reflector
+			cfArrivals := []goroom.Arrival{}
+			for _, source := range sources {
+				for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
+					arrival, err := cfRoom.TraceShot(shot, listenPos, goroom.TraceParams{
+						Order:         config.Simulation.Order,
+						GainThreshold: config.Simulation.GainThresholdDB,
+						TimeThreshold: config.Simulation.TimeThresholdMS * MS,
+						RFZRadius:     config.Simulation.RFZRadius,
+					})
+					if err != nil {
+						summary.AddError(goroom.ErrSimulation, err)
+						return err
+					}
+					cfArrivals = append(cfArrivals, arrival...)
+				}
+			}
+			sort.Slice(cfArrivals, func(i int, j int) bool {
+				return cfArrivals[i].Distance < cfArrivals[j].Distance
+			})
+
+			filteredArrivals := []goroom.Arrival{}
+			for _, arr := range arrivals {
+				for _, ref := range arr.AllReflections {
+					if ref.Surface.Name == c.Counterfactual {
+						filteredArrivals = append(filteredArrivals, arr)
+					}
+				}
+			}
+
+			testShotEquivalence := func(arr1, arr2 goroom.Arrival) bool {
+				return arr1.Shot.Gain == arr2.Shot.Gain && arr1.Shot.Ray.Direction == arr2.Shot.Ray.Direction && arr1.Shot.Ray.Origin == arr2.Shot.Ray.Origin
+			}
+
+			cfUniqueArrivals := []goroom.Arrival{}
+		outer:
+			for _, cfArr := range cfArrivals {
+				for _, fArr := range filteredArrivals {
+					if testShotEquivalence(cfArr, fArr) {
+						continue outer
+					}
+					cfUniqueArrivals = append(cfUniqueArrivals, cfArr)
+					for _, ref := range cfArr.AllReflections {
+						if ref.Surface.Name == c.Counterfactual {
+							annotations.Points = append(annotations.Points, goroom.Point{
+								Position: ref.Position,
+								Name:     "",
+								Color:    goroom.PastelGreen,
+							})
+						}
+					}
+				}
+			}
+			// for i, arr := range filteredArrivals {
+			// 	annotations.Arrivals = append(annotations.Arrivals, arr)
+			// 	annotations.PathColors[i] = goroom.PastelLavender
+			// }
+			// annotations.Arrivals = append(annotations.Arrivals, cfUniqueArrivals...)
+		}
 		annotations.Arrivals = arrivals
 
 		var ITD float64
