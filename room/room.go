@@ -44,7 +44,7 @@ func NewMaterial(alphaMap map[float64]float64) Material {
 }
 
 func PerfectReflector() Material {
-	return Material{alphaFunc: lin.Function{[]float64{125}, []float64{0.0}}}
+	return Material{alphaFunc: lin.Function{[]float64{125}, []float64{0.00001}}, alphaMap: map[float64]float64{125: 0.00001}}
 }
 
 func (m Material) Alpha(freq float64) float64 {
