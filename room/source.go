@@ -18,6 +18,18 @@ type Shot struct {
 	Gain float64
 }
 
+func (s Shot) Equal(test Shot) bool {
+	const epsilon = 1e-7
+
+	return math.Abs(s.Ray.Origin.X-test.Ray.Origin.X) < epsilon &&
+		math.Abs(s.Ray.Origin.Y-test.Ray.Origin.Y) < epsilon &&
+		math.Abs(s.Ray.Origin.Z-test.Ray.Origin.Z) < epsilon &&
+		math.Abs(s.Ray.Direction.X-test.Ray.Direction.X) < epsilon &&
+		math.Abs(s.Ray.Direction.Y-test.Ray.Direction.Y) < epsilon &&
+		math.Abs(s.Ray.Direction.Z-test.Ray.Direction.Z) < epsilon &&
+		math.Abs(s.Gain-test.Gain) < epsilon
+}
+
 type directivity struct {
 	horizFunc     lin.Function
 	vertFunc      lin.Function

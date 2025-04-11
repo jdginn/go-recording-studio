@@ -249,15 +249,24 @@ func (c SimulateCmd) Run() (err error) {
 		}
 
 		if c.Counterfactual != "" {
+			reflectsOffSurface := func(arr goroom.Arrival, surfaceName string) bool {
+				for _, ref := range arr.AllReflections {
+					if ref.Surface.Name == surfaceName {
+						return true
+					}
+				}
+				return false
+			}
 			surfaceMap := config.SurfaceAssignmentMap()
 			if c.Counterfactual != "" {
+				fmt.Println(surfaceMap[c.Counterfactual])
 				surfaceMap[c.Counterfactual] = goroom.PerfectReflector()
+				fmt.Println(surfaceMap[c.Counterfactual])
 			}
-			cfRoom, _, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
+			cfRoom, _, err := goroom.NewFrom3MF(config.Input.Mesh.Path, surfaceMap)
 			if err != nil {
 				return err
 			}
-
 			// Simulate reflections AS IF the counterfactual surface were a perfect reflector
 			cfArrivals := []goroom.Arrival{}
 			for _, source := range sources {
@@ -272,7 +281,13 @@ func (c SimulateCmd) Run() (err error) {
 						summary.AddError(goroom.ErrSimulation, err)
 						return err
 					}
-					cfArrivals = append(cfArrivals, arrival...)
+					for _, a := range arrival {
+						if a.Distance != goroom.INF {
+							if reflectsOffSurface(a, c.Counterfactual) {
+								cfArrivals = append(cfArrivals, a)
+							}
+						}
+					}
 				}
 			}
 			sort.Slice(cfArrivals, func(i int, j int) bool {
@@ -281,41 +296,39 @@ func (c SimulateCmd) Run() (err error) {
 
 			filteredArrivals := []goroom.Arrival{}
 			for _, arr := range arrivals {
-				for _, ref := range arr.AllReflections {
-					if ref.Surface.Name == c.Counterfactual {
-						filteredArrivals = append(filteredArrivals, arr)
-					}
+				if reflectsOffSurface(arr, c.Counterfactual) {
+					filteredArrivals = append(filteredArrivals, arr)
 				}
-			}
-
-			testShotEquivalence := func(arr1, arr2 goroom.Arrival) bool {
-				return arr1.Shot.Gain == arr2.Shot.Gain && arr1.Shot.Ray.Direction == arr2.Shot.Ray.Direction && arr1.Shot.Ray.Origin == arr2.Shot.Ray.Origin
 			}
 
 			cfUniqueArrivals := []goroom.Arrival{}
 		outer:
 			for _, cfArr := range cfArrivals {
 				for _, fArr := range filteredArrivals {
-					if testShotEquivalence(cfArr, fArr) {
+					if cfArr.Shot.Equal(fArr.Shot) {
 						continue outer
 					}
-					cfUniqueArrivals = append(cfUniqueArrivals, cfArr)
-					for _, ref := range cfArr.AllReflections {
-						if ref.Surface.Name == c.Counterfactual {
-							annotations.Points = append(annotations.Points, goroom.Point{
-								Position: ref.Position,
-								Name:     "",
-								Color:    goroom.PastelGreen,
-							})
-						}
+				}
+				cfUniqueArrivals = append(cfUniqueArrivals, cfArr)
+				for _, ref := range cfArr.AllReflections {
+					if ref.Surface.Name == c.Counterfactual {
+						// annotations.Points = append(annotations.Points, goroom.Point{
+						// 	Position: ref.Position,
+						// 	Name:     "",
+						// 	Color:    goroom.PastelGreen,
+						// })
 					}
 				}
 			}
+			fmt.Println("Total arrivals: ", len(arrivals))
+			fmt.Println("Total filtered arrivals: ", len(filteredArrivals))
+			fmt.Println("Total counterfactual arrivals: ", len(cfArrivals))
+			fmt.Println("Total unique counterfactual arrivals: ", len(cfUniqueArrivals))
 			// for i, arr := range filteredArrivals {
 			// 	annotations.Arrivals = append(annotations.Arrivals, arr)
 			// 	annotations.PathColors[i] = goroom.PastelLavender
 			// }
-			// annotations.Arrivals = append(annotations.Arrivals, cfUniqueArrivals...)
+			annotations.Arrivals = append(annotations.Arrivals, cfUniqueArrivals...)
 		}
 		annotations.Arrivals = arrivals
 
