@@ -31,7 +31,7 @@ type directivity struct {
 //
 // horiz and vert are maps of angle in degrees to gain in dB. Gain should always be negative except at 0 degrees.
 // Angles must be positive and in ascending order. The gain at angle θ is equal to the gain at angle -θ.
-func NewDirectivity(horiz, vert map[float64]float64) directivity {
+func NewDirectivity(horiz, vert map[float64]float64) *directivity {
 	d := directivity{}
 
 	// Helper function to validate and process angle-gain maps
@@ -81,7 +81,7 @@ func NewDirectivity(horiz, vert map[float64]float64) directivity {
 	d.maxVertAngle = vX[len(vX)-1]
 	d.minVertGain = vY[len(vY)-1]
 
-	return d
+	return &d
 }
 
 // GainDB returns the gain in dB for a given horizontal and vertical angle
@@ -134,7 +134,7 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 						Add(pt.Vector{X: math.Cos(yawRads), Y: 0, Z: math.Sin(yawRads)}).
 						Normalize(),
 				},
-				Gain: fromDB(s.Directivity.GainDB(yaw, pitch)),
+				Gain: fromDB(s.GainDB(yaw, pitch)),
 			})
 		}
 	}
@@ -202,7 +202,17 @@ func (s *Speaker) SampleCone(angleDegrees float64, numRays int) []pt.Ray {
 type LoudSpeakerSpec struct {
 	Xdim, Ydim, Zdim float64
 	Yoff, Zoff       float64
-	Directivity      directivity
+	HDirectivityMap  map[float64]float64
+	VDirectivityMap  map[float64]float64
+
+	directivity *directivity
+}
+
+func (spec LoudSpeakerSpec) GainDB(yaw, pitch float64) float64 {
+	if spec.directivity == nil {
+		spec.directivity = NewDirectivity(spec.HDirectivityMap, spec.VDirectivityMap)
+	}
+	return spec.directivity.GainDB(yaw, pitch)
 }
 
 func raise(v r3.Vec) quat.Number {
