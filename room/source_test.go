@@ -271,3 +271,46 @@ func TestRotateSpeaker(t *testing.T) {
 		})
 	}
 }
+
+func TestSampleDeterminism(t *testing.T) {
+	almostMatch := func(a, b float64) bool {
+		return math.Abs(a-b) < 0.00001
+	}
+
+	hDirMap := map[float64]float64{0: 0, 10: -5, 30: -10, 60: -15, 90: -20}
+	vDirMap := map[float64]float64{0: 0, 10: -5, 30: -10, 60: -15, 90: -20}
+	pos := V(10, 10, 10)
+	dir := V(1, 1, 0)
+
+	// Build the spec from scratch each time, just in case there is something nondeterministic in its construction
+	s1 := NewSpeaker(LoudSpeakerSpec{Xdim: 2, Ydim: 2, Zdim: 2, HDirectivityMap: hDirMap, VDirectivityMap: vDirMap}, pos, dir)
+	s2 := NewSpeaker(LoudSpeakerSpec{Xdim: 2, Ydim: 2, Zdim: 2, HDirectivityMap: hDirMap, VDirectivityMap: vDirMap}, pos, dir)
+
+	samples1 := s1.Sample(10_000, 90, 90)
+	samples2 := s2.Sample(10_000, 90, 90)
+
+	for i := 0; i < len(samples1); i++ {
+
+		if !almostMatch(samples1[i].Ray.Origin.X, samples2[i].Ray.Origin.X) {
+			t.Errorf("samples %v+ != %v+\n\tRay.Origin.X %f != %f", samples1[i], samples2[i], samples1[i].Ray.Origin.X, samples2[i].Ray.Origin.X)
+		}
+		if !almostMatch(samples1[i].Ray.Origin.Y, samples2[i].Ray.Origin.Y) {
+			t.Errorf("samples %v+ != %v+\n\tRay.Origin.Y %f != %f", samples1[i], samples2[i], samples1[i].Ray.Origin.Y, samples2[i].Ray.Origin.Y)
+		}
+		if !almostMatch(samples1[i].Ray.Origin.Z, samples2[i].Ray.Origin.Z) {
+			t.Errorf("samples %v+ != %v+\n\tRay.Origin.Z %f != %f", samples1[i], samples2[i], samples1[i].Ray.Origin.Z, samples2[i].Ray.Origin.Z)
+		}
+		if !almostMatch(samples1[i].Ray.Direction.X, samples2[i].Ray.Direction.X) {
+			t.Errorf("samples %v+ != %v+\n\tRay.Direction.X %f != %f", samples1[i], samples2[i], samples1[i].Ray.Direction.X, samples2[i].Ray.Direction.X)
+		}
+		if !almostMatch(samples1[i].Ray.Direction.Y, samples2[i].Ray.Direction.Y) {
+			t.Errorf("samples %v+ != %v+\n\tRay.Direction.Y %f != %f", samples1[i], samples2[i], samples1[i].Ray.Direction.Y, samples2[i].Ray.Direction.Y)
+		}
+		if !almostMatch(samples1[i].Ray.Direction.Z, samples2[i].Ray.Direction.Z) {
+			t.Errorf("samples %v+ != %v+\n\tRay.Direction.Z %f != %f", samples1[i], samples2[i], samples1[i].Ray.Direction.Z, samples2[i].Ray.Direction.Z)
+		}
+		if !almostMatch(samples1[i].Gain, samples2[i].Gain) {
+			t.Errorf("samples %v+ != %v+\n\tGain %f != %f", samples1[i], samples2[i], samples1[i].Gain, samples2[i].Gain)
+		}
+	}
+}
