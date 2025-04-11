@@ -78,12 +78,13 @@ type Speaker struct {
 
 func (s Speaker) Create() room.LoudSpeakerSpec {
 	return room.LoudSpeakerSpec{
-		Xdim:        s.Dimensions.X,
-		Ydim:        s.Dimensions.Y,
-		Zdim:        s.Dimensions.Z,
-		Yoff:        s.Offset.Y,
-		Zoff:        s.Offset.Z,
-		Directivity: room.NewDirectivity(s.Directivity.Horizontal, s.Directivity.Vertical),
+		Xdim:            s.Dimensions.X,
+		Ydim:            s.Dimensions.Y,
+		Zdim:            s.Dimensions.Z,
+		Yoff:            s.Offset.Y,
+		Zoff:            s.Offset.Z,
+		HDirectivityMap: s.Directivity.Horizontal,
+		VDirectivityMap: s.Directivity.Vertical,
 	}
 }
 
