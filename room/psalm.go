@@ -346,7 +346,7 @@ type AnalysisResults struct {
 	EnergyOverWindow float64 `json:"avg_energy_over_window,omitempty"`
 	ITD2             float64 `json:"ITD_2,omitempty"`
 	AvgGain5ms       float64 `json:"avg_gain_5ms,omitempty"`
-	ListenPosDist    float64 `json:"listen_pos_dist,omitempty"`
+	ListenPosX       float64 `json:"listen_pos_x,omitempty"`
 	T60Sabine        float64 `json:"T60_sabine,omitempty"`
 	T60Eyering       float64 `json:"T60_eyering,omitempty"`
 	SchroederFreq    float64 `json:"schroeder_freq,omitempty"`
