@@ -156,7 +156,7 @@ func (c SimulateCmd) Run() (err error) {
 	// Compute the position of the speakers as well as the listening position
 	lt := config.ListeningTriangle.Create()
 	listenPos, equilateralPos := lt.ListenPosition()
-	summary.Results.ListenPosDist = listenPos.X // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along the X axis
+	summary.Results.ListenPosX = listenPos.X // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along the X axis
 	annotations.Zones = append(annotations.Zones, goroom.Zone{
 		Center: listenPos,
 		Radius: config.Simulation.RFZRadius,
