@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 
 	"github.com/alecthomas/kong"
@@ -84,12 +85,12 @@ var CLI struct {
 }
 
 type SimulateCmd struct {
-	Config                 string `arg:"" name:"config" help:"config file to simulate"`
-	OutputDir              string `arg:"" optional:"" name:"output-dir" help:"directory to store output in"`
-	SkipSpeakerInRoomCheck bool   `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
-	SkipAddSpeakerWall     bool   `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
-	SkipTracing            bool   `name:"skip-tracing" help:"don't perform any of the tracing steps"`
-	Counterfactual         string `name:"counterfactual" help:"simulate reflections that *would* arrive at the listening position if the given surface were a perfect reflector"`
+	Config                 string   `arg:"" name:"config" help:"config file to simulate"`
+	OutputDir              string   `arg:"" optional:"" name:"output-dir" help:"directory to store output in"`
+	SkipSpeakerInRoomCheck bool     `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
+	SkipAddSpeakerWall     bool     `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
+	SkipTracing            bool     `name:"skip-tracing" help:"don't perform any of the tracing steps"`
+	Counterfactual         []string `name:"counterfactual" help:"simulate reflections that *would* arrive at the listening position if the given surface were a perfect reflector"`
 }
 
 func (c SimulateCmd) Run() (err error) {
@@ -244,30 +245,33 @@ func (c SimulateCmd) Run() (err error) {
 		})
 		summary.Results.ITD = arrivals[0].ITD()
 
-		if c.Counterfactual == "" {
+		if len(c.Counterfactual) == 0 {
 			annotations.Arrivals = arrivals
 		}
 
-		if c.Counterfactual != "" {
-			reflectsOffSurface := func(arr goroom.Arrival, surfaceName string) bool {
+		if len(c.Counterfactual) > 0 {
+			reflectsOffSurface := func(arr goroom.Arrival, surfaces []string) bool {
 				for _, ref := range arr.AllReflections {
-					if ref.Surface.Name == surfaceName {
+					if ref.Surface.Name == "Diffuser Hall" {
+						fmt.Printf("Surface: %s\n\tCounterfactual: %v\n", ref.Surface.Name, c.Counterfactual)
+					}
+					if slices.Contains(surfaces, ref.Surface.Name) {
+						fmt.Println("Contains")
 						return true
 					}
 				}
 				return false
 			}
 			surfaceMap := config.SurfaceAssignmentMap()
-			if c.Counterfactual != "" {
-				fmt.Println(surfaceMap[c.Counterfactual])
-				surfaceMap[c.Counterfactual] = goroom.PerfectReflector()
-				fmt.Println(surfaceMap[c.Counterfactual])
+			for _, c := range c.Counterfactual {
+				fmt.Printf("Making %s a perfect absorber\n", c)
+				surfaceMap[c] = goroom.PerfectAbsorber()
 			}
 			cfRoom, _, err := goroom.NewFrom3MF(config.Input.Mesh.Path, surfaceMap)
 			if err != nil {
 				return err
 			}
-			// Simulate reflections AS IF the counterfactual surface were a perfect reflector
+			// Simulate reflections AS IF the counterfactual surface were a perfect absorber
 			cfArrivals := []goroom.Arrival{}
 			for _, source := range sources {
 				for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
@@ -294,29 +298,30 @@ func (c SimulateCmd) Run() (err error) {
 				return cfArrivals[i].Distance < cfArrivals[j].Distance
 			})
 
-			filteredArrivals := []goroom.Arrival{}
-			for _, arr := range arrivals {
-				if reflectsOffSurface(arr, c.Counterfactual) {
-					filteredArrivals = append(filteredArrivals, arr)
-				}
-			}
+			// filteredArrivals := []goroom.Arrival{}
+			filteredArrivals := arrivals
+			// for _, arr := range arrivals {
+			// 	if reflectsOffSurface(arr, c.Counterfactual) {
+			// 		filteredArrivals = append(filteredArrivals, arr)
+			// 	}
+			// }
 
 			cfUniqueArrivals := []goroom.Arrival{}
 		outer:
-			for _, cfArr := range cfArrivals {
-				for _, fArr := range filteredArrivals {
+			for _, fArr := range filteredArrivals {
+				for _, cfArr := range cfArrivals {
 					if cfArr.Shot.Equal(fArr.Shot) {
 						continue outer
 					}
 				}
-				cfUniqueArrivals = append(cfUniqueArrivals, cfArr)
-				for _, ref := range cfArr.AllReflections {
-					if ref.Surface.Name == c.Counterfactual {
-						// annotations.Points = append(annotations.Points, goroom.Point{
-						// 	Position: ref.Position,
-						// 	Name:     "",
-						// 	Color:    goroom.PastelGreen,
-						// })
+				cfUniqueArrivals = append(cfUniqueArrivals, fArr)
+				for _, ref := range fArr.AllReflections {
+					if slices.Contains(c.Counterfactual, ref.Surface.Name) {
+						annotations.Points = append(annotations.Points, goroom.Point{
+							Position: ref.Position,
+							Name:     "",
+							Color:    goroom.PastelGreen,
+						})
 					}
 				}
 			}
