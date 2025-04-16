@@ -170,7 +170,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
 			})
-			fmt.Printf("Dist: %f, dist_diff: %f, null_freq: %f\n", distance+distToRFZ, arrivals[len(arrivals)-1].Distance-arrivals[len(arrivals)-1].DirectDist(), arrivals[len(arrivals)-1].NullFreq())
+			// fmt.Printf("Dist: %f, dist_diff: %f, null_freq: %f\n", distance+distToRFZ, arrivals[len(arrivals)-1].Distance-arrivals[len(arrivals)-1].DirectDist(), arrivals[len(arrivals)-1].NullFreq())
 		}
 
 	}
