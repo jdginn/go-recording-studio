@@ -1,25 +1,9 @@
 input:
   mesh:
-    path: "Cutout.3mf"
+    path: "angled_diffuser.3mf"
 
 materials:
-  inline:
-    brick:
-      absorption: 0.04
-    wood:
-      absorption: 0.1
-    gypsum:
-      absorption: 0.05
-    diffuser:
-      absorption: 0.99
-    rockwool_12cm:
-      absorption: 0.9
-    rockwool_24cm:
-      absorption: 0.996
-    rockwool_30cm:
-      absorption: 0.999
-    glass:
-      absorption: 0.0
+  from_file: "materials.yaml"
 
 surface_assignments:
   inline:
@@ -29,19 +13,23 @@ surface_assignments:
     Front B: "gypsum"
     Window A: "glass"
     Window B: "glass"
-    left speaker wall: "gypsum"
-    right speaker wall: "gypsum"
-    Center Ceiling Absorber: "rockwool_24cm"
-    Left Ceiling Absorber: "rockwool_24cm"
-    Right Ceiling Absorber: "rockwool_24cm"
-    Back Diffuser: "diffuser"
-    Ceiling Absorber: "rockwool_12cm"
-    Secondary Ceiling Absorber L: "rockwool_12cm"
-    Secondary Ceiling Absorber R: "rockwool_12cm"
+    # left speaker wall: "gypsum"
+    # right speaker wall: "gypsum"
+    # Center Ceiling Absorber: "rockwool_24cm"
+    # Left Ceiling Absorber: "rockwool_24cm"
+    # Right Ceiling Absorber: "rockwool_24cm"
+    # Back Diffuser: "diffuser"
+    # Ceiling Absorber: "rockwool_12cm"
+    # Secondary Ceiling Absorber L: "rockwool_12cm"
+    # Secondary Ceiling Absorber R: "rockwool_12cm"
+    Alcove Back: "rockwool_24cm"
     Street Absorber: "rockwool_24cm"
-    Front Hall Absorber: "rockwool_24cm"
-    Back Hall Absorber: "rockwool_24cm"
+    Front Hall Absorber: "rockwool_12cm"
+    Back Hall Absorber: "rockwool_12cm"
     Cutout Top: "rockwool_24cm"
+    Alcove Street: "rockwool_12cm"
+    Alcove Hallway: "rockwool_12cm"
+    Alcove Top: "rockwool_12cm"
 
 speaker:
   model: "SQT"
@@ -71,20 +59,20 @@ speaker:
       90: -24
 
 listening_triangle:
-  reference_position: [0, 2.37, 0.0]
+  reference_position: [0, 2.38, 0.0]
   reference_normal: [1, 0, 0]
-  distance_from_front: 0.516
-  distance_from_center: 1.352
-  source_height: 1.7
+  distance_from_front: 0.4
+  distance_from_center: 0.95
+  source_height: 1.4
   listen_height: 1.4
 
 simulation:
   rfz_radius: 0.5
-  shot_count: 10000
-  shot_angle_range: 180
+  shot_count: 100000
+  shot_angle_range: 100
   order: 10
-  gain_threshold_db: -15
-  time_threshold_ms: 100
+  gain_threshold_db: -17
+  time_threshold_ms: 30
 
 flags:
   skip_speaker_in_room_check: false
