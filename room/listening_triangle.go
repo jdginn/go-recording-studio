@@ -7,10 +7,10 @@ import (
 )
 
 // Value from Rod Gervais' book Home Recording Studio: Build It Like The Pros
-const LISTEN_DIST_INTO_TRIANGLE = 0.38
+// const LISTEN_DIST_INTO_TRIANGLE = 0.38
 
 // Value from Thomas Northward posted on GearSpae
-// const LISTEN_DIST_INTO_TRIANGLE = 0.32
+const LISTEN_DIST_INTO_TRIANGLE = 0.32
 
 type ListeningTriangle struct {
 	// A point on the front wall
