@@ -240,6 +240,7 @@ func (c SimulateCmd) Run() (err error) {
 				arrivals = append(arrivals, arrival...)
 			}
 		}
+		summary.Successful()
 		sort.Slice(arrivals, func(i int, j int) bool {
 			return arrivals[i].Distance < arrivals[j].Distance
 		})
@@ -297,6 +298,7 @@ func (c SimulateCmd) Run() (err error) {
 			sort.Slice(cfArrivals, func(i int, j int) bool {
 				return cfArrivals[i].Distance < cfArrivals[j].Distance
 			})
+			summary.Successful()
 
 			// filteredArrivals := []goroom.Arrival{}
 			filteredArrivals := arrivals
