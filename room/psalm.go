@@ -304,7 +304,7 @@ func (a Annotations) WriteToJSON(filename string) error {
 type Status string
 
 const (
-	NoErr         Status = "success"
+	Success       Status = "success"
 	ErrValidation Status = "validation_error"
 	ErrSimulation Status = "simulation_error"
 )
@@ -330,6 +330,10 @@ func (r *Summary) AddError(status Status, err error) {
 		r.Status = status
 	}
 	r.Errors = append(r.Errors, err.Error())
+}
+
+func (r *Summary) Successful() {
+	r.Status = Success
 }
 
 func (r Summary) WriteToJSON(filename string) error {
