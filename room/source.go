@@ -14,8 +14,10 @@ import (
 )
 
 type Shot struct {
-	Ray  pt.Ray
-	Gain float64
+	Ray        pt.Ray
+	Normal     pt.Ray
+	Gain       float64
+	Yaw, Pitch float64
 }
 
 func (s Shot) Equal(test Shot) bool {
@@ -127,6 +129,15 @@ type Source struct {
 
 func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 	shots := make([]Shot, 0, numSamples)
+	// Build local tangent space
+	normal := s.NormalDirection.Normalize()
+	var tangent pt.Vector
+	if math.Abs(normal.X) > math.Abs(normal.Z) {
+		tangent = pt.Vector{Y: 1, Z: 0, X: 0}.Cross(normal).Normalize()
+	} else {
+		tangent = pt.Vector{X: 1, Y: 0, Z: 0}.Cross(normal).Normalize()
+	}
+	bitangent := normal.Cross(tangent)
 
 	var vertSteps, horizSteps int
 	horizSteps = int(math.Floor(math.Sqrt(float64(numSamples))))
@@ -138,15 +149,27 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 			pitch := -vertRange + 2*vertRange*(float64(y)/float64(vertSteps))
 			pitchRads := pitch / 180 * math.Pi
 
+			// Spherical coordinates from the normal direction
+			direction := s.NormalDirection.MulScalar(math.Cos(pitchRads) * math.Cos(yawRads)).
+				Add(tangent.MulScalar(math.Sin(pitchRads))).
+				Add(bitangent.MulScalar(math.Cos(pitchRads) * math.Sin(yawRads)))
+
 			shots = append(shots, Shot{
 				Ray: pt.Ray{
-					Origin: s.Position,
-					Direction: s.NormalDirection.
-						Add(pt.Vector{X: math.Cos(pitchRads), Y: math.Sin(pitchRads), Z: 0}).
-						Add(pt.Vector{X: math.Cos(yawRads), Y: 0, Z: math.Sin(yawRads)}).
-						Normalize(),
+					Origin:    s.Position,
+					Direction: direction,
+					// Direction: pt.Vector{
+					// 	X: rotatedYaw.X*math.Cos(pitchRads) + s.NormalDirection.Z*math.Sin(pitchRads),
+					// 	Y: rotatedYaw.Y,
+					// 	Z: -rotatedYaw.X*math.Sin(pitchRads) + rotatedYaw.Z*math.Cos(pitchRads),
+					// },
+				}, Normal: pt.Ray{
+					Origin:    s.Position,
+					Direction: s.NormalDirection,
 				},
-				Gain: fromDB(s.GainDB(yaw, pitch)),
+				Gain:  fromDB(s.GainDB(yaw, pitch)),
+				Yaw:   yaw,
+				Pitch: pitch,
 			})
 		}
 	}

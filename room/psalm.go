@@ -98,8 +98,11 @@ type RayJSON struct {
 }
 
 type ShotJSON struct {
-	Ray  RayJSON `json:"ray"`
-	Gain float64 `json:"gain"` // stored in dB
+	Ray          RayJSON `json:"ray"`
+	SourceNormal RayJSON `json:"sourceNormal"`
+	Gain         float64 `json:"gain"`  // stored in dB
+	Yaw          float64 `json:"yaw"`   // stored in deg
+	Pitch        float64 `json:"pitch"` // stored in deg
 }
 
 type NearestApproachJSON struct {
@@ -179,6 +182,17 @@ func ArrivalToAcousticPathJSON(a Arrival) AcousticPathJSON {
 					Z: a.Shot.Ray.Direction.Z,
 				},
 			},
+			SourceNormal: RayJSON{
+				Origin: PointToJSON(Point{Position: a.Shot.Ray.Origin}),
+				Direction: VectorJSON{
+					X: a.Shot.Normal.Direction.X,
+					Y: a.Shot.Normal.Direction.Y,
+					Z: a.Shot.Normal.Direction.Z,
+				},
+			},
+			Yaw:   a.Shot.Yaw,
+			Pitch: a.Shot.Pitch,
+
 			Gain: toDB(a.Shot.Gain),
 		},
 		Gain:     toDB(a.Gain),
