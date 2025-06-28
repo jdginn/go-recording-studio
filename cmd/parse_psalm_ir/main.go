@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 )
 
 type Point3 struct {
@@ -100,6 +101,17 @@ func main() {
 	inFile := os.Args[1]
 	outFile := os.Args[2]
 
+	// Default: include all gains
+	gainThreshold := -120.0
+	if len(os.Args) >= 4 {
+		var err error
+		gainThreshold, err = strconv.ParseFloat(os.Args[3], 64)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid gain threshold: %v\n", err)
+			os.Exit(2)
+		}
+	}
+
 	f, err := os.Open(inFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Cannot open input file: %v\n", err)
@@ -117,6 +129,9 @@ func main() {
 	const speedOfSound = 343.0 // m/s
 
 	for _, path := range annotations.AcousticPaths {
+		if path.Gain < gainThreshold {
+			continue
+		}
 		directDist := euclideanDistance(path.NearestApproach.Position, path.Shot.Ray.Origin)
 		deltaDist := path.Distance - directDist
 		timeMs := deltaDist / speedOfSound * 1000.0
@@ -137,7 +152,7 @@ func main() {
 	defer out.Close()
 
 	// fmt.Fprintln(out, "Impulse Response Peaks")
-	for _, p := range FindLocalMaximaClusters(peaks, 0.05, 4) {
+	for _, p := range FindLocalMaximaClusters(peaks, 0.05, 12) {
 		// for _, p := range peaks {
 		fmt.Fprintf(out, "%.6fms, %.2fdB\n", p.TimeMs, p.GainDb)
 	}
