@@ -118,14 +118,16 @@ type PathJSON struct {
 }
 
 type AcousticPathJSON struct {
-	Reflections     []ReflectionJSON    `json:"reflections"`
-	Shot            ShotJSON            `json:"shot"`
-	Gain            float64             `json:"gain"` // stored in dB
-	Distance        float64             `json:"distance"`
-	NearestApproach NearestApproachJSON `json:"nearestApproach"`
-	Name            string              `json:"name,omitempty"`
-	Color           string              `json:"color,omitempty"`
-	Thickness       float64             `json:"thickness,omitempty"`
+	Reflections         []ReflectionJSON    `json:"reflections"`
+	Shot                ShotJSON            `json:"shot"`
+	GainFromReflections float64             `json:"gainFromReflections"` // stored in dB
+	GainFromDistance    float64             `json:"gainFromDistance"`    // stored in dB
+	Gain                float64             `json:"gain"`                // stored in dB
+	Distance            float64             `json:"distance"`
+	NearestApproach     NearestApproachJSON `json:"nearestApproach"`
+	Name                string              `json:"name,omitempty"`
+	Color               string              `json:"color,omitempty"`
+	Thickness           float64             `json:"thickness,omitempty"`
 }
 
 type ZoneJSON struct {
@@ -192,11 +194,12 @@ func ArrivalToAcousticPathJSON(a Arrival) AcousticPathJSON {
 			},
 			Yaw:   a.Shot.Yaw,
 			Pitch: a.Shot.Pitch,
-
-			Gain: toDB(a.Shot.Gain),
+			Gain:  toDB(a.Shot.Gain),
 		},
-		Gain:     toDB(a.Gain),
-		Distance: a.Distance,
+		GainFromReflections: toDB(a.GainFromReflections),
+		GainFromDistance:    toDB(a.GainFromDistance),
+		Gain:                toDB(a.Gain),
+		Distance:            a.Distance,
 		NearestApproach: NearestApproachJSON{
 			Position: PointToJSON(Point{Position: a.NearestApproachPosition}),
 			Distance: a.NearestApproachDistance,
