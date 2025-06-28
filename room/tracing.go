@@ -38,6 +38,10 @@ type Arrival struct {
 	LastReflection pt.Vector
 	// Slice of positions of all reflections
 	AllReflections []Reflection
+	// Gain contribution from imperfect reflection, dB
+	GainFromReflections float64
+	// Gain contribution from distance (6dB rule)
+	GainFromDistance float64
 	// Gain in dB relative to the direct signal
 	Gain float64
 	// Total distance traveled by this ray across all reflections, in meters
@@ -121,6 +125,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 	if err != nil {
 		return arrivals, err
 	}
+	directDistance := shot.Ray.Origin.Sub(listenPos).Length()
 	currentRay := shot.Ray
 	gain := shot.Gain
 	distance := 0.0
@@ -135,6 +140,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 			Position: info.Position, Normal: info.Normal,
 			Surface: *info.Shape.(*Triangle).Surface,
 		})
+
 		// TODO: LOOK HERE: assuming alpha of 1000Hz is a very dangerous assumption!
 		gain = gain * (1 - info.Shape.(*Triangle).Surface.Material.Alpha(1000))
 		distance = distance + hit.T
@@ -159,18 +165,22 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 			// With null frequency, calculate all gains based on frequency
 
 			distToRFZ := pos.Sub(currentRay.Origin).Length()
-			// finalDist := distance + distToRFZ
+			totalDist := distance + distToRFZ
+
+			// Gain decreases with the square of distance ("the 6dB rule")
+			gainFromDistance := 1 / math.Pow(totalDist/directDistance, 2)
 
 			arrivals = append(arrivals, Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
-				Gain:                    gain,
-				Distance:                distance + distToRFZ,
+				GainFromReflections:     gain,
+				GainFromDistance:        gainFromDistance,
+				Gain:                    gain * gainFromDistance,
+				Distance:                totalDist,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
 			})
-			// fmt.Printf("Dist: %f, dist_diff: %f, null_freq: %f\n", distance+distToRFZ, arrivals[len(arrivals)-1].Distance-arrivals[len(arrivals)-1].DirectDist(), arrivals[len(arrivals)-1].NullFreq())
 		}
 
 	}
