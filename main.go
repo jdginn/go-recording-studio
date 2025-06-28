@@ -90,6 +90,8 @@ type SimulateCmd struct {
 	SkipSpeakerInRoomCheck bool     `name:"skip-speaker-in-room-check" help:"don't check whether speaker is inside room"`
 	SkipAddSpeakerWall     bool     `name:"skip-add-speaker-wall" help:"don't add a wall for the speaker to be flushmounted in"`
 	SkipTracing            bool     `name:"skip-tracing" help:"don't perform any of the tracing steps"`
+	SimulateLSpeaker       bool     `name:"simulate-lspeaker" help:"simulate the left speaker"`
+	SimulateRSpeaker       bool     `name:"simulate-rspeaker" help:"simulate the right speaker"`
 	Counterfactual         []string `name:"counterfactual" help:"simulate reflections that *would* arrive at the listening position if the given surface were a perfect reflector"`
 }
 
@@ -164,19 +166,29 @@ func (c SimulateCmd) Run() (err error) {
 
 	// Create the speakers
 	speakerSpec := config.Speaker.Create()
-	sources := []goroom.Speaker{
-		goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal()),
-		goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal()),
+	sources := []goroom.Speaker{}
+	paths := []goroom.PsalmPath{}
+
+	if c.SimulateLSpeaker || config.Flags.SimulateLSpeaker {
+		lSource := goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal())
+		sources = append(sources, lSource)
+		paths = append(paths, goroom.PsalmPath{Points: []goroom.Point{{Position: lt.LeftSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed})
+		lSpeakerCone, err := room.GetSpeakerCone(lSource, 30, 16, goroom.PastelGreen)
+		if err != nil {
+			return err
+		}
+		paths = append(paths, lSpeakerCone...)
 	}
-
-	lDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.LeftSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed}
-	rDirectPath := goroom.PsalmPath{Points: []goroom.Point{{Position: lt.RightSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed}
-
-	paths := []goroom.PsalmPath{lDirectPath, rDirectPath}
-
-	lSpeakerCone, err := room.GetSpeakerCone(sources[0], 30, 16, goroom.PastelGreen)
-	rSpeakerCone, err := room.GetSpeakerCone(sources[1], 30, 16, goroom.PastelLavender)
-	paths = append(paths, append(lSpeakerCone, rSpeakerCone...)...)
+	if c.SimulateRSpeaker || config.Flags.SimulateRSpeaker {
+		rSource := goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal())
+		sources = append(sources, rSource)
+		paths = append(paths, goroom.PsalmPath{Points: []goroom.Point{{Position: lt.RightSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed})
+		rSpeakerCone, err := room.GetSpeakerCone(rSource, 30, 16, goroom.PastelLavender)
+		if err != nil {
+			return err
+		}
+		paths = append(paths, rSpeakerCone...)
+	}
 
 	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
 		// Check whether the speakers are inside the room

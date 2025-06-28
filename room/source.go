@@ -158,11 +158,6 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 				Ray: pt.Ray{
 					Origin:    s.Position,
 					Direction: direction,
-					// Direction: pt.Vector{
-					// 	X: rotatedYaw.X*math.Cos(pitchRads) + s.NormalDirection.Z*math.Sin(pitchRads),
-					// 	Y: rotatedYaw.Y,
-					// 	Z: -rotatedYaw.X*math.Sin(pitchRads) + rotatedYaw.Z*math.Cos(pitchRads),
-					// },
 				}, Normal: pt.Ray{
 					Origin:    s.Position,
 					Direction: s.NormalDirection,
