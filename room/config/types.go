@@ -144,6 +144,8 @@ type Simulation struct {
 type Flags struct {
 	SkipSpeakerInRoomCheck bool `yaml:"skip_speaker_in_room_check"`
 	SkipAddSpeakerWall     bool `yaml:"skip_add_speaker_wall"`
+	SimulateLSpeaker       bool `yaml:"simulate_l_speaker"`
+	SimulateRSpeaker       bool `yaml:"simulate_r_speaker"`
 }
 
 type CeilingPanels struct {
