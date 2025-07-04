@@ -170,7 +170,7 @@ func (c SimulateCmd) Run() (err error) {
 	paths := []goroom.PsalmPath{}
 
 	if c.SimulateLSpeaker || config.Flags.SimulateLSpeaker {
-		lSource := goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal())
+		lSource := goroom.NewSpeaker(speakerSpec, lt.LeftSourcePosition(), lt.LeftSourceNormal(), "Left")
 		sources = append(sources, lSource)
 		paths = append(paths, goroom.PsalmPath{Points: []goroom.Point{{Position: lt.LeftSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed})
 		lSpeakerCone, err := room.GetSpeakerCone(lSource, 30, 16, goroom.PastelGreen)
@@ -180,7 +180,7 @@ func (c SimulateCmd) Run() (err error) {
 		paths = append(paths, lSpeakerCone...)
 	}
 	if c.SimulateRSpeaker || config.Flags.SimulateRSpeaker {
-		rSource := goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal())
+		rSource := goroom.NewSpeaker(speakerSpec, lt.RightSourcePosition(), lt.RightSourceNormal(), "Right")
 		sources = append(sources, rSource)
 		paths = append(paths, goroom.PsalmPath{Points: []goroom.Point{{Position: lt.RightSourcePosition()}, {Position: equilateralPos}}, Color: goroom.BrightRed})
 		rSpeakerCone, err := room.GetSpeakerCone(rSource, 30, 16, goroom.PastelLavender)
