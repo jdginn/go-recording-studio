@@ -127,7 +127,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 	}
 	directDistance := shot.Ray.Origin.Sub(listenPos).Length()
 	currentRay := shot.Ray
-	gain := shot.Gain
+	gainFromReflections := shot.Gain
 	distance := 0.0
 	hitPositions := []Reflection{{Position: shot.Ray.Origin}}
 	for i := 0; i < params.Order; i++ {
@@ -141,9 +141,11 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 			Surface: *info.Shape.(*Triangle).Surface,
 		})
 
-		// TODO: LOOK HERE: assuming alpha of 1000Hz is a very dangerous assumption!
-		gain = gain * (1 - info.Shape.(*Triangle).Surface.Material.Alpha(1000))
 		distance = distance + hit.T
+		// TODO: LOOK HERE: assuming alpha of 1000Hz is a very dangerous assumption!
+		gainFromReflections = gainFromReflections * (1 - info.Shape.(*Triangle).Surface.Material.Alpha(1000))
+		gainFromDistance := 1 / math.Pow(distance/directDistance, 2)
+		totalGain := gainFromReflections * gainFromDistance
 
 		// nextRay := currentRay.Reflect(info.Ray)
 		nextRay := info.Ray
@@ -151,7 +153,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 		currentRay = nextRay
 
 		pastMaxOrder := i >= params.Order-1
-		pastGainThresh := toDB(gain) <= params.GainThreshold
+		pastGainThresh := toDB(totalGain) <= params.GainThreshold
 		pastTimeThresh := distance/SPEED_OF_SOUND > params.TimeThreshold
 		if pastMaxOrder || pastGainThresh || pastTimeThresh {
 			return arrivals, nil
@@ -174,9 +176,9 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
-				GainFromReflections:     gain,
+				GainFromReflections:     gainFromReflections,
 				GainFromDistance:        gainFromDistance,
-				Gain:                    gain * gainFromDistance,
+				Gain:                    gainFromReflections * gainFromDistance,
 				Distance:                totalDist,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
