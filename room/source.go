@@ -18,6 +18,7 @@ type Shot struct {
 	Normal     pt.Ray
 	Gain       float64
 	Yaw, Pitch float64
+	SourceName string
 }
 
 func (s Shot) Equal(test Shot) bool {
@@ -125,6 +126,7 @@ func (d *directivity) GainDB(horizAngle, vertAngle float64) float64 {
 type Source struct {
 	Position        pt.Vector
 	NormalDirection pt.Vector
+	Name            string
 }
 
 func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
@@ -162,9 +164,10 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 					Origin:    s.Position,
 					Direction: s.NormalDirection,
 				},
-				Gain:  fromDB(s.GainDB(yaw, pitch)),
-				Yaw:   yaw,
-				Pitch: pitch,
+				Gain:       fromDB(s.GainDB(yaw, pitch)),
+				Yaw:        yaw,
+				Pitch:      pitch,
+				SourceName: s.Name,
 			})
 		}
 	}
@@ -254,12 +257,13 @@ type Speaker struct {
 	Source
 }
 
-func NewSpeaker(spec LoudSpeakerSpec, pos pt.Vector, dir pt.Vector) Speaker {
+func NewSpeaker(spec LoudSpeakerSpec, pos pt.Vector, dir pt.Vector, name string) Speaker {
 	return Speaker{
 		LoudSpeakerSpec: spec,
 		Source: Source{
 			Position:        pos,
 			NormalDirection: dir,
+			Name:            name,
 		},
 	}
 }

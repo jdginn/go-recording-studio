@@ -283,8 +283,8 @@ func TestSampleDeterminism(t *testing.T) {
 	dir := V(1, 1, 0)
 
 	// Build the spec from scratch each time, just in case there is something nondeterministic in its construction
-	s1 := NewSpeaker(LoudSpeakerSpec{Xdim: 2, Ydim: 2, Zdim: 2, HDirectivityMap: hDirMap, VDirectivityMap: vDirMap}, pos, dir)
-	s2 := NewSpeaker(LoudSpeakerSpec{Xdim: 2, Ydim: 2, Zdim: 2, HDirectivityMap: hDirMap, VDirectivityMap: vDirMap}, pos, dir)
+	s1 := NewSpeaker(LoudSpeakerSpec{Xdim: 2, Ydim: 2, Zdim: 2, HDirectivityMap: hDirMap, VDirectivityMap: vDirMap}, pos, dir, "")
+	s2 := NewSpeaker(LoudSpeakerSpec{Xdim: 2, Ydim: 2, Zdim: 2, HDirectivityMap: hDirMap, VDirectivityMap: vDirMap}, pos, dir, "")
 
 	samples1 := s1.Sample(10_000, 90, 90)
 	samples2 := s2.Sample(10_000, 90, 90)
