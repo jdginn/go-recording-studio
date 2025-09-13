@@ -189,6 +189,90 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 	panic("Code bug")
 }
 
+// TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
+//
+// See the Params struct type.
+func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params TraceParams) ([]Arrival, error) {
+	arrivals := []Arrival{}
+	mesh, err := r.mesh()
+	if err != nil {
+		return arrivals, err
+	}
+	directDistance := shot.Ray.Origin.Sub(listenPos).Length()
+	currentRay := shot.Ray
+	gainFromReflections := shot.Gain
+	distance := 0.0
+	hitPositions := []Reflection{{Position: shot.Ray.Origin}}
+	for i := 0; i < params.Order; i++ {
+		hit := mesh.Intersect(currentRay)
+		if !hit.Ok() {
+			return arrivals, fmt.Errorf("Nonterminating ray")
+		}
+		info := hit.Info(currentRay)
+		hitPositions = append(hitPositions, Reflection{
+			Position: info.Position, Normal: info.Normal,
+			Surface: *info.Shape.(*Triangle).Surface,
+		})
+
+		distance = distance + hit.T
+		// TODO: LOOK HERE: assuming alpha of 1000Hz is a very dangerous assumption!
+		gainFromReflections = gainFromReflections * (1 - info.Shape.(*Triangle).Surface.Material.Alpha(1000))
+		gainFromDistance := 1 / math.Pow(distance/directDistance, 2)
+		totalGain := gainFromReflections * gainFromDistance
+
+		// nextRay := currentRay.Reflect(info.Ray)
+		nextRay := info.Ray
+		verifyReflectionLaw(currentRay, info.Normal, nextRay)
+		currentRay = nextRay
+
+		pastMaxOrder := i >= params.Order-1
+		pastGainThresh := toDB(totalGain) <= params.GainThreshold
+		pastTimeThresh := distance/SPEED_OF_SOUND > params.TimeThreshold
+		if pastMaxOrder || pastGainThresh || pastTimeThresh {
+			arrivals = append(arrivals, Arrival{
+				Shot:                    shot,
+				LastReflection:          info.Position,
+				AllReflections:          hitPositions,
+				GainFromReflections:     gainFromReflections,
+				GainFromDistance:        gainFromDistance,
+				Gain:                    gainFromReflections * gainFromDistance,
+				Distance:                distance,
+				NearestApproachDistance: nearestApproach(currentRay, listenPos),
+				NearestApproachPosition: info.Position,
+			})
+			return arrivals, nil
+		}
+
+		pos, isWithinRFZ := rayHemisphereIntersection(currentRay, listenPos, params.RFZRadius)
+
+		if isWithinRFZ {
+			// TODO:
+			// From dist , get null frequency
+			// With null frequency, calculate all gains based on frequency
+
+			distToRFZ := pos.Sub(currentRay.Origin).Length()
+			totalDist := distance + distToRFZ
+
+			// Gain decreases with the square of distance ("the 6dB rule")
+			gainFromDistance := 1 / math.Pow(totalDist/directDistance, 2)
+
+			arrivals = append(arrivals, Arrival{
+				Shot:                    shot,
+				LastReflection:          info.Position,
+				AllReflections:          hitPositions,
+				GainFromReflections:     gainFromReflections,
+				GainFromDistance:        gainFromDistance,
+				Gain:                    gainFromReflections * gainFromDistance,
+				Distance:                totalDist,
+				NearestApproachDistance: nearestApproach(currentRay, listenPos),
+				NearestApproachPosition: pos,
+			})
+		}
+
+	}
+	panic("Code bug")
+}
+
 func (r *Room) GetSpeakerCone(speaker Speaker, angle float64, N int, color string) ([]PsalmPath, error) {
 	paths := make([]PsalmPath, 0, N)
 	rays := speaker.SampleCone(angle, N)
