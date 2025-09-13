@@ -97,6 +97,8 @@ type SimulateCmd struct {
 	SimulateLSpeaker       bool     `name:"simulate-lspeaker" help:"simulate the left speaker"`
 	SimulateRSpeaker       bool     `name:"simulate-rspeaker" help:"simulate the right speaker"`
 	Counterfactual         []string `name:"counterfactual" help:"simulate reflections that *would* arrive at the listening position if the given surface were a perfect reflector"`
+	OverrideListenPosition string   `name:"override-listen-position" help:"override the listening position with a specific x,y,z position (in m from origin)"`
+	OverrideRFZRadius      float64  `name:"override-rfz-radius" help:"override the radius of the reflection-free zone around the listening position (in m)" default:"0"`
 }
 
 func (c SimulateCmd) Run() (err error) {
@@ -162,10 +164,24 @@ func (c SimulateCmd) Run() (err error) {
 	// Compute the position of the speakers as well as the listening position
 	lt := config.ListeningTriangle.Create()
 	listenPos, equilateralPos := lt.ListenPosition()
+	speakerNormalListenPos := listenPos
+	if c.OverrideListenPosition != "" {
+		overridePos, err := parseTargetPosition(c.OverrideListenPosition)
+		if err != nil {
+			return fmt.Errorf("parsing override listen position: %w", err)
+		}
+		listenPos = overridePos
+		fmt.Println("Overriding listen position to ", listenPos)
+	}
+	radius := config.Simulation.RFZRadius
+	if c.OverrideRFZRadius != 0 {
+		radius = c.OverrideRFZRadius
+		fmt.Println("Overriding RFZ radius to ", radius)
+	}
 	summary.Results.ListenPosX = listenPos.X // TODO: technically, this is an unsafe assumption since the room is not guaranteed to always be oriented along the X axis
 	annotations.Zones = append(annotations.Zones, goroom.Zone{
 		Center: listenPos,
-		Radius: config.Simulation.RFZRadius,
+		Radius: radius,
 	})
 
 	// Create the speakers
@@ -197,7 +213,7 @@ func (c SimulateCmd) Run() (err error) {
 	if !(c.SkipSpeakerInRoomCheck || config.Flags.SkipSpeakerInRoomCheck) {
 		// Check whether the speakers are inside the room
 		for i, source := range sources {
-			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, listenPos)
+			offendingVertex, intersectingPoint, ok := source.IsInsideRoom(room.M, speakerNormalListenPos)
 			if !ok {
 				room.M.SaveSTL(expDir.GetFilePath("room.stl"))
 				p1 := goroom.Point{
@@ -237,6 +253,7 @@ func (c SimulateCmd) Run() (err error) {
 	// addCeilingAbsorbers(room, lt, *config)
 
 	if !c.SkipTracing {
+
 		var totalShots int
 		// Simulate reflections
 		arrivals := []goroom.Arrival{}
@@ -247,7 +264,7 @@ func (c SimulateCmd) Run() (err error) {
 					Order:         config.Simulation.Order,
 					GainThreshold: config.Simulation.GainThresholdDB,
 					TimeThreshold: config.Simulation.TimeThresholdMS * MS,
-					RFZRadius:     config.Simulation.RFZRadius,
+					RFZRadius:     radius,
 				})
 				if err != nil {
 					summary.AddError(goroom.ErrSimulation, err)
@@ -296,7 +313,7 @@ func (c SimulateCmd) Run() (err error) {
 						Order:         config.Simulation.Order,
 						GainThreshold: config.Simulation.GainThresholdDB,
 						TimeThreshold: config.Simulation.TimeThresholdMS * MS,
-						RFZRadius:     config.Simulation.RFZRadius,
+						RFZRadius:     radius,
 					})
 					if err != nil {
 						summary.AddError(goroom.ErrSimulation, err)
