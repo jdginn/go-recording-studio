@@ -174,6 +174,179 @@ func (s *Speaker) Sample(numSamples int, horizRange, vertRange float64) []Shot {
 	return shots
 }
 
+// Helper: Calculate yaw from speaker normal to direction
+func AngleYaw(normal, direction, tangent, bitangent pt.Vector) float64 {
+	// Project direction into normal-bitangent plane
+	normal = normal.Normalize()
+	bitangent = bitangent.Normalize()
+	return math.Atan2(direction.Dot(bitangent), direction.Dot(normal)) * 180 / math.Pi
+}
+
+// Helper: Calculate pitch from speaker normal to direction
+func AnglePitch(normal, direction, tangent pt.Vector) float64 {
+	// Project direction onto tangent
+	tangent = tangent.Normalize()
+	return math.Asin(direction.Dot(tangent)) * 180 / math.Pi
+}
+
+func (s *Speaker) SampleWithNormal(targetVector pt.Vector, numSamples int, horizRange, vertRange float64) []Shot {
+	fmt.Printf("Sampling speaker '%s' with normal %v towards target vector %v\n", s.Name, s.NormalDirection, targetVector)
+
+	if numSamples < 1 {
+		return nil
+	}
+	shots := make([]Shot, 0, numSamples)
+
+	// Build local tangent space around targetVector
+	targetVector = targetVector.Normalize()
+	var tangent pt.Vector
+	if math.Abs(targetVector.X) > math.Abs(targetVector.Z) {
+		tangent = pt.Vector{Y: 1, Z: 0, X: 0}.Cross(targetVector).Normalize()
+	} else {
+		tangent = pt.Vector{X: 1, Y: 0, Z: 0}.Cross(targetVector).Normalize()
+	}
+	bitangent := targetVector.Cross(tangent)
+
+	// First shot: straight at targetVector
+	shots = append(shots, Shot{
+		Ray: pt.Ray{
+			Origin:    s.Position,
+			Direction: targetVector,
+		},
+		Normal: pt.Ray{
+			Origin:    s.Position,
+			Direction: s.NormalDirection,
+		},
+		Gain:       fromDB(s.GainDB(AngleYaw(s.NormalDirection, targetVector, tangent, bitangent), AnglePitch(s.NormalDirection, targetVector, tangent))),
+		Yaw:        AngleYaw(s.NormalDirection, targetVector, tangent, bitangent),
+		Pitch:      AnglePitch(s.NormalDirection, targetVector, tangent),
+		SourceName: s.Name,
+	})
+	if numSamples == 1 {
+		return shots
+	}
+
+	horizSteps := int(math.Floor(math.Sqrt(float64(numSamples))))
+	if horizSteps < 1 {
+		horizSteps = 1
+	}
+	vertSteps := (numSamples - 1) / horizSteps
+	if vertSteps < 1 {
+		vertSteps = 1
+	}
+
+	for x := 0; x < horizSteps; x++ {
+		yaw := -horizRange + 2*horizRange*(float64(x)/float64(horizSteps-1))
+		yawRads := yaw * math.Pi / 180
+		for y := 0; y < vertSteps; y++ {
+			pitch := -vertRange + 2*vertRange*(float64(y)/float64(vertSteps-1))
+			pitchRads := pitch * math.Pi / 180
+
+			// Spherical coordinates from targetVector
+			direction := targetVector.MulScalar(math.Cos(pitchRads) * math.Cos(yawRads)).
+				Add(bitangent.MulScalar(math.Cos(pitchRads) * math.Sin(yawRads))).
+				Add(tangent.MulScalar(math.Sin(pitchRads))).Normalize()
+
+			// Calculate yaw/pitch from speaker normal to this direction
+			gainYaw := AngleYaw(s.NormalDirection, direction, tangent, bitangent)
+			gainPitch := AnglePitch(s.NormalDirection, direction, tangent)
+
+			shots = append(shots, Shot{
+				Ray: pt.Ray{
+					Origin:    s.Position,
+					Direction: direction,
+				},
+				Normal: pt.Ray{
+					Origin:    s.Position,
+					Direction: s.NormalDirection,
+				},
+				Gain:       fromDB(s.GainDB(gainYaw, gainPitch)),
+				Yaw:        gainYaw,
+				Pitch:      gainPitch,
+				SourceName: s.Name,
+			})
+		}
+	}
+
+	for shot := range shots {
+		fmt.Printf("  Shot %d: dir=%v, gain=%.2f dB, yaw=%.2f, pitch=%.2f\n", shot, shots[shot].Ray.Direction, 10*math.Log10(shots[shot].Gain), shots[shot].Yaw, shots[shot].Pitch)
+	}
+
+	return shots
+}
+
+// func (s *Speaker) SampleWithNormal(targetVector pt.Vector, numSamples int, horizRange, vertRange float64) []Shot {
+// 	if numSamples < 1 {
+// 		return nil
+// 	}
+// 	shots := make([]Shot, 0, numSamples)
+// 	// Build local tangent space
+// 	targetVector = targetVector.Normalize()
+// 	var tangent pt.Vector
+// 	if math.Abs(targetVector.X) > math.Abs(targetVector.Z) {
+// 		tangent = pt.Vector{Y: 1, Z: 0, X: 0}.Cross(targetVector).Normalize()
+// 	} else {
+// 		tangent = pt.Vector{X: 1, Y: 0, Z: 0}.Cross(targetVector).Normalize()
+// 	}
+// 	bitangent := targetVector.Cross(tangent)
+//
+// 	shots = append(shots, Shot{
+// 		Ray: pt.Ray{
+// 			Origin:    s.Position,
+// 			Direction: targetVector,
+// 		}, Normal: pt.Ray{
+// 			Origin:    s.Position,
+// 			Direction: s.NormalDirection,
+// 		},
+// 		Gain:       fromDB(s.GainDB(0, 0)),
+// 		Yaw:        AngleYaw(s.NormalDirection, targetVector, tangent, bitangent),
+// 		Pitch:      AnglePitch(s.NormalDirection, targetVector, tangent),
+// 		SourceName: s.Name,
+// 	})
+//
+// 	horizSteps := int(math.Floor(math.Sqrt(float64(numSamples))))
+// 	if horizSteps < 1 {
+// 		horizSteps = 1
+// 	}
+// 	vertSteps := (numSamples - 1) / horizSteps
+// 	if vertSteps < 1 {
+// 		vertSteps = 1
+// 	}
+//
+// 	for x := 0; x < horizSteps; x++ {
+// 		yaw := -horizRange + 2*horizRange*(float64(x)/float64(horizSteps-1))
+// 		yawRads := yaw / 180 * math.Pi
+// 		for y := 0; y < vertSteps; y++ {
+// 			pitch := -vertRange + 2*vertRange*(float64(y)/float64(vertSteps-1))
+// 			pitchRads := pitch / 180 * math.Pi
+//
+// 			// Spherical coordinates from the normal direction
+// 			direction := targetVector.MulScalar(math.Cos(pitchRads) * math.Cos(yawRads)).
+// 				Add(tangent.MulScalar(math.Sin(pitchRads))).
+// 				Add(bitangent.MulScalar(math.Cos(pitchRads) * math.Sin(yawRads)))
+//
+// 			// Calculate yaw/pitch from speaker normal to this direction
+// 			gainYaw := AngleYaw(s.NormalDirection, direction, tangent, bitangent)
+// 			gainPitch := AnglePitch(s.NormalDirection, direction, tangent)
+//
+// 			shots = append(shots, Shot{
+// 				Ray: pt.Ray{
+// 					Origin:    s.Position,
+// 					Direction: direction,
+// 				}, Normal: pt.Ray{
+// 					Origin:    s.Position,
+// 					Direction: s.NormalDirection,
+// 				},
+// 				Gain:       fromDB(s.GainDB(gainYaw, gainPitch)),
+// 				Yaw:        gainYaw,
+// 				Pitch:      gainPitch,
+// 				SourceName: s.Name,
+// 			})
+// 		}
+// 	}
+// 	return shots
+// }
+
 // alignWithNormal rotates a vector that was generated assuming Y-up normal
 // to align with the actual normal direction
 func alignWithNormal(dir, normal pt.Vector) pt.Vector {
