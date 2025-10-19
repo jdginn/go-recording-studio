@@ -374,4 +374,5 @@ type AnalysisResults struct {
 	T60Eyering       float64 `json:"T60_eyering,omitempty"`
 	SchroederFreq    float64 `json:"schroeder_freq,omitempty"`
 	Volume           float64 `json:"volume,omitempty"`
+	NominalT60       float64 `json:"nominal_T60,omitempty"`
 }

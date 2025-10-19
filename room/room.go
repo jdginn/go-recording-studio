@@ -417,6 +417,14 @@ func (r *Room) Volume() (float64, error) {
 	return ComputeMeshVolume(interior), nil
 }
 
+func (r *Room) NominalT60() (float64, error) {
+	volume, err := r.Volume()
+	if err != nil {
+		return 0, err
+	}
+	return 0.25 * math.Pow((volume/100), 1.0/3.0), nil
+}
+
 const (
 	SABINE          = 0.161
 	EYERING         = 55.3
