@@ -145,7 +145,15 @@ func (c SimulateCmd) Run() (err error) {
 	}()
 
 	volume, err := room.Volume()
+	if err != nil {
+		return err
+	}
 	summary.Results.Volume = volume
+	nominalT60, err := room.NominalT60()
+	if err != nil {
+		return err
+	}
+	summary.Results.NominalT60 = nominalT60
 	// Calculate decay characteristics that can be known without the listening position
 	t60Sabine, err := room.T60Sabine(150)
 	if err != nil {
@@ -498,6 +506,11 @@ func (c TraceCmd) Run() (err error) {
 	// Calculate volume
 	volume, err := room.Volume()
 	summary.Results.Volume = volume
+	nominalT60, err := room.NominalT60()
+	if err != nil {
+		return err
+	}
+	summary.Results.NominalT60 = nominalT60
 	// Calculate decay characteristics that can be known without the listening position
 	t60Sabine, err := room.T60Sabine(150)
 	if err != nil {
