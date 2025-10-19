@@ -149,7 +149,7 @@ func (c SimulateCmd) Run() (err error) {
 		return err
 	}
 	summary.Results.Volume = volume
-	nominalT60, err := room.NominalT60()
+	nominalT60, err := room.EBU3276TargetT60()
 	if err != nil {
 		return err
 	}
@@ -506,7 +506,7 @@ func (c TraceCmd) Run() (err error) {
 	// Calculate volume
 	volume, err := room.Volume()
 	summary.Results.Volume = volume
-	nominalT60, err := room.NominalT60()
+	nominalT60, err := room.EBU3276TargetT60()
 	if err != nil {
 		return err
 	}
