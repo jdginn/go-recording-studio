@@ -1,6 +1,7 @@
 package room
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -97,9 +98,21 @@ func (s *Surface) Absorber(thickness, height float64, material Material) *Surfac
 	panic("Surface is not on a normal we know how to work with")
 }
 
+var triangleIDCounter = 0
+
 type Triangle struct {
 	pt.Triangle
 	Surface *Surface
+	id      int
+}
+
+func NewTriangle(ptTri pt.Triangle, surface *Surface) *Triangle {
+	triangleIDCounter++
+	return &Triangle{
+		Triangle: ptTri,
+		Surface:  surface,
+		id:       triangleIDCounter,
+	}
 }
 
 func (t Triangle) T() *pt.Triangle {
@@ -223,7 +236,7 @@ func NewFrom3MF(filepath string, materials map[string]Material) (*Room, map[stri
 					Z: float64(obj.Mesh.Vertices.Vertex[t.V3].Z() / SCALE),
 				}
 				ptTri.FixNormals()
-				triangles = append(triangles, &Triangle{Triangle: ptTri, Surface: surface})
+				triangles = append(triangles, NewTriangle(ptTri, surface))
 				theseTriangles[i] = &ptTri
 			}
 			surface.M = pt.NewMesh(theseTriangles)
@@ -346,6 +359,26 @@ func triangleCentroid(triangle pt.TriangleInt) pt.Vector {
 	}
 }
 
+const normalEps = 1e-12
+
+// triangleNormal returns the normalized surface normal for the triangle.
+// The direction (sign) depends on the vertex winding order: cross(V2-V1, V3-V1).
+// If the triangle is degenerate (area ≈ 0) a zero vector is returned.
+func triangleNormal(triangle pt.TriangleInt) pt.Vector {
+	tri := triangle.T()
+	v1, v2, v3 := tri.V1, tri.V2, tri.V3
+
+	e1 := v2.Sub(v1)
+	e2 := v3.Sub(v1)
+
+	n := e1.Cross(e2)
+	norm := n.Length()
+	if norm <= normalEps {
+		return pt.Vector{X: 0, Y: 0, Z: 0} // degenerate triangle
+	}
+	return n.MulScalar(1.0 / norm)
+}
+
 // Check if a triangle is inside the mesh
 func isTriangleInside(triangle pt.TriangleInt, mesh *pt.Mesh) bool {
 	centroid := triangleCentroid(triangle)
@@ -356,13 +389,157 @@ func isTriangleInside(triangle pt.TriangleInt, mesh *pt.Mesh) bool {
 	return countIntersections(ray, mesh)%2 == 1
 }
 
+const (
+	rayEps  = 1e-6
+	distEps = 1e-6
+)
+
+func (r *Room) findTriangleIndexByCentroid(targetCentroid pt.Vector) int {
+	for i, t := range r.M.Triangles {
+		c := triangleCentroid(t)
+		if c.Sub(targetCentroid).Length() <= distEps {
+			return i
+		}
+	}
+	return -1
+}
+
+// isInnermost returns true if the given triangle is visible from the room interior
+// and its geometric normal points inward (toward the room center).
+func (r *Room) isInnermost(triangle pt.TriangleInt) bool {
+	center := r.M.BoundingBox().Center()
+	centroid := triangleCentroid(triangle)
+
+	dir := centroid.Sub(center)
+	if dir.Length() < rayEps {
+		// Degenerate case: centroid is (nearly) at the center — treat as not innermost.
+		return false
+	}
+
+	// Ray from just inside the room center toward the triangle centroid.
+	ray := pt.Ray{
+		Origin:    center.Add(dir.Normalize().MulScalar(rayEps * 10)), // small offset to avoid self-hit
+		Direction: dir.Normalize(),
+	}
+
+	minT := math.Inf(1)
+	var innermost *Triangle
+	for _, tri := range r.M.Triangles {
+		hit := tri.Intersect(ray)
+		if hit.Ok() && hit.T > rayEps && hit.T < minT {
+			innermost = tri.(*Triangle)
+		}
+	}
+	return innermost.id == triangle.(*Triangle).id
+
+	//
+	// // expectedT := centroid.Sub(ray.Origin).Length()
+	// // if math.Abs(minT-expectedT) > distEps*expectedT {
+	// // 	// The first hit is the triangle but at a different distance (likely near-coincident geometry).
+	// // 	// Treat conservatively as not innermost.
+	// // 	return false
+	// // }
+	//
+	// // Check triangle normal orientation: if normal points toward center -> faces inward.
+	// n := triangleNormal(triangle)
+	// if n.Length() <= rayEps {
+	// 	// Degenerate normal -> cannot determine orientation reliably; treat as not innermost.
+	// 	return false
+	// }
+	// if n.Normalize().Dot(center.Sub(centroid)) > 0 {
+	// 	return true
+	// }
+	return true
+}
+
+// isOutermost returns true if the given triangle is visible from outside the mesh.
+// It places a probe point outside the mesh in the direction of the triangle normal (or away from center if normal degenerate),
+// casts a ray toward the centroid, and checks if the triangle is the first hit.
+func (r *Room) isOutermost(triangle pt.TriangleInt) bool {
+	centroid := triangleCentroid(triangle)
+	bb := r.M.BoundingBox()
+	diag := bb.Max.Sub(bb.Min).Length()
+	outsideDist := diag * 1.5
+	if outsideDist <= 0 {
+		fmt.Println("Doing fallback...")
+		outsideDist = 100.0 // fallback
+	}
+
+	// Use triangle normal to place the outside probe; fallback to centroid->center direction.
+	n := triangleNormal(triangle)
+	var outsideProbe pt.Vector
+	if n.Length() <= rayEps {
+		// fallback: place probe opposite the room center direction
+		center := r.M.BoundingBox().Center()
+		dir := centroid.Sub(center)
+		if dir.Length() < rayEps {
+			// degenerate: place probe along +Z as last resort
+			outsideProbe = centroid.Add(pt.Vector{X: 0, Y: 0, Z: outsideDist})
+			panic("Degenerate case in isOutermost")
+		} else {
+			outsideProbe = centroid.Add(dir.Normalize().MulScalar(outsideDist))
+			panic("Degenerate normal in isOutermost")
+		}
+	} else {
+		outsideProbe = centroid.Add(n.Normalize().MulScalar(outsideDist))
+	}
+
+	// Ray pointing from outside probe toward centroid
+	ray := pt.Ray{
+		Origin:    outsideProbe,
+		Direction: centroid.Sub(outsideProbe).Normalize(),
+	}
+
+	// Find first intersection along this ray.
+	minT := math.Inf(1)
+	nHits := 0
+	for _, tri := range r.M.Triangles {
+		hit := tri.Intersect(ray)
+		if hit.Ok() && hit.T > rayEps && hit.T < minT {
+			minT = hit.T
+			nHits++
+		}
+	}
+
+	if nHits == 0 {
+		panic("Open mesh")
+	}
+	if nHits == 1 {
+		return true
+	}
+
+	// Check hit distance roughly equals distance to centroid (guard against coincident geometry)
+	expectedT := centroid.Sub(ray.Origin).Length()
+	if math.Abs(minT-expectedT) > distEps*expectedT {
+		return false
+	}
+
+	return true
+}
+
+func (r *Room) ExteriorMesh() (*pt.Mesh, error) {
+	newTriangles := []pt.TriangleInt{}
+
+	for _, tri := range r.M.Triangles {
+		if r.isOutermost(tri) {
+			newTriangles = append(newTriangles, tri)
+		} else {
+			// fmt.Printf("Not outermost: %v\n", tri.(*Triangle).Surface.Name)
+		}
+	}
+
+	return pt.NewMesh(newTriangles), nil
+}
+
 // InteriorMesh returns the mesh describing the innermost set of walls in the room
 func (r *Room) InteriorMesh() (*pt.Mesh, error) {
 	newTriangles := []pt.TriangleInt{}
 
 	for _, tri := range r.M.Triangles {
-		if isTriangleInside(tri, r.M) {
+		if r.isInnermost(tri) {
 			newTriangles = append(newTriangles, tri)
+		} else {
+			// fmt.Printf("Not innermost: %v\n", tri.(*Triangle).Surface.Name)
 		}
 	}
 
@@ -409,11 +586,10 @@ func (r *Room) SurfaceArea() (float64, error) {
 
 // Volume returns the volume of the INTERIOR of the room
 func (r *Room) Volume() (float64, error) {
-	// interior, err := r.InteriorMesh()
-	// if err != nil {
-	// 	return 0, err
-	// }
-	interior := r.M
+	interior, err := r.ExteriorMesh()
+	if err != nil {
+		return 0, err
+	}
 	return ComputeMeshVolume(interior), nil
 }
 
@@ -435,7 +611,15 @@ const (
 func (r *Room) T60Sabine(freq float64) (float64, error) {
 	sabines := 0.0
 	for _, tri := range r.M.Triangles {
-		sabines += tri.(*Triangle).Surface.Material.Alpha(freq) * tri.T().Area()
+		if r.isInnermost(tri) {
+			sabines += tri.(*Triangle).Surface.Material.Alpha(freq) * tri.T().Area()
+			if tri.T().Area() < 0. {
+				fmt.Printf("Negative area triangle detected: %+v\n", tri.T())
+			}
+			if tri.(*Triangle).Surface.Material.Alpha(freq) < 0. {
+				fmt.Printf("Negative alpha detected: %+v\n", tri.T())
+			}
+		}
 	}
 	v, err := r.Volume()
 	if err != nil {

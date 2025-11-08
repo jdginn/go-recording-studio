@@ -56,9 +56,15 @@ func (c SimulateCmd) Run() (err error) {
 	vol, err := room.Volume()
 	fmt.Printf("Room volume: %.2f m³\n\n", vol)
 
+	schroeder, err := room.SchroederFreq()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Schroeder frequency: %.0f Hz\n\n", schroeder)
+
 	t60s := make([]float64, len(testFrequencies))
 	for i, freq := range testFrequencies {
-		t60, err := room.T60Eyring(freq)
+		t60, err := room.T60Sabine(freq)
 		if err != nil {
 			return err
 		}

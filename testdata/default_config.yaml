@@ -43,25 +43,27 @@ speaker:
   directivity:
     horizontal:
       0: 0
-      30: -3
-      45: -6
-      50: -9
+      18: -3
+      30: -6
+      45: -9
+      50: -21
       60: -12
-      65: -15
-      90: -24
+      90: -21
+      120: -30
     vertical:
       0: 0
-      30: -3
-      45: -6
-      50: -9
+      18: -3
+      30: -6
+      45: -9
+      50: -21
       60: -12
-      65: -15
-      90: -24
+      90: -21
+      120: -30
 
 listening_triangle:
   reference_position: [0, 2.38, 0.0]
   reference_normal: [1, 0, 0]
-  distance_from_front: 0.4
+  distance_from_front: 0.38
   distance_from_center: 0.95
   source_height: 1.4
   listen_height: 1.4
@@ -69,14 +71,16 @@ listening_triangle:
 simulation:
   rfz_radius: 0.5
   shot_count: 100000
-  shot_angle_range: 100
+  shot_angle_range: 120
   order: 10
-  gain_threshold_db: -17
+  gain_threshold_db: -20
   time_threshold_ms: 30
 
 flags:
   skip_speaker_in_room_check: false
-  skip_add_speaker_wall: false
+  skip_add_speaker_wall: true
+  simulate_l_speaker: false
+  simulate_r_speaker: true
 
 ceiling_panels:
   center:
