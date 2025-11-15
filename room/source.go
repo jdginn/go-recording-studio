@@ -190,8 +190,6 @@ func AnglePitch(normal, direction, tangent pt.Vector) float64 {
 }
 
 func (s *Speaker) SampleWithNormal(targetVector pt.Vector, numSamples int, horizRange, vertRange float64) []Shot {
-	fmt.Printf("Sampling speaker '%s' with normal %v towards target vector %v\n", s.Name, s.NormalDirection, targetVector)
-
 	if numSamples < 1 {
 		return nil
 	}
@@ -268,9 +266,9 @@ func (s *Speaker) SampleWithNormal(targetVector pt.Vector, numSamples int, horiz
 		}
 	}
 
-	for shot := range shots {
-		fmt.Printf("  Shot %d: dir=%v, gain=%.2f dB, yaw=%.2f, pitch=%.2f\n", shot, shots[shot].Ray.Direction, 10*math.Log10(shots[shot].Gain), shots[shot].Yaw, shots[shot].Pitch)
-	}
+	// for shot := range shots {
+	// 	fmt.Printf("  Shot %d: dir=%v, gain=%.2f dB, yaw=%.2f, pitch=%.2f\n", shot, shots[shot].Ray.Direction, 10*math.Log10(shots[shot].Gain), shots[shot].Yaw, shots[shot].Pitch)
+	// }
 
 	return shots
 }
