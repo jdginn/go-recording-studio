@@ -102,6 +102,10 @@ func (c SimulateCmd) Run() (err error) {
 		return err
 	}
 
+	// for _, surf := range surfaces {
+	// 	fmt.Printf("Surface: %s\n", surf.Name)
+	// }
+
 	// Sabine/Eyering part
 
 	vol, err := room.Volume()
@@ -160,7 +164,7 @@ func (c SimulateCmd) Run() (err error) {
 			GainThreshold: config.Simulation.GainThresholdDB,
 			TimeThreshold: config.Simulation.TimeThresholdMS * MS,
 			RFZRadius:     config.Simulation.RFZRadius,
-		}, 4000)
+		}, 2000)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			fmt.Printf("Shot origin: %v\n", shot.Ray.Origin)
@@ -215,10 +219,15 @@ func (c SimulateCmd) Run() (err error) {
 
 	// Find dB max (start of decay)
 	maxDB := decayDB[0]
+	for i := 1; i < binCount; i++ {
+		if decayDB[i] > maxDB {
+			maxDB = decayDB[i]
+		}
+	}
 
-	// Choose range for linear regression: -5dB to -35dB below peak
+	// Choose range for linear regression: -10dB to -50dB below peak
 	startThresh := maxDB - 10
-	endThresh := maxDB - 40
+	endThresh := maxDB - 50
 
 	var xvals []float64 // times in ms
 	var yvals []float64 // decayDB values
