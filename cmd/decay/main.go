@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/alecthomas/kong"
 	"github.com/fogleman/pt/pt"
@@ -155,23 +156,40 @@ func (c SimulateCmd) Run() (err error) {
 	normal := pt.Vector{1, 0, 0}
 	speakerSpec := config.Speaker.Create()
 	source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, "Source") // Normal direction doesn't matter for omnidirectional source
-	arrivals := []goroom.Arrival{}
-	totalShots := 0
+	arrivalsChan := make(chan []goroom.Arrival, config.Simulation.ShotCount)
+	wg := sync.WaitGroup{}
+
 	for _, shot := range source.SampleWithNormal(normal, config.Simulation.ShotCount, 180, 180) {
-		totalShots += 1
-		theseArrivals, err := room.TraceShotUnconditional(shot, listenPos, goroom.TraceParams{
-			Order:         config.Simulation.Order,
-			GainThreshold: config.Simulation.GainThresholdDB,
-			TimeThreshold: config.Simulation.TimeThresholdMS * MS,
-			RFZRadius:     config.Simulation.RFZRadius,
-		}, 2000)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			fmt.Printf("Shot origin: %v\n", shot.Ray.Origin)
-			fmt.Printf("Shot direction: %v\n", shot.Ray.Direction)
-			return err
-		}
-		arrivals = append(arrivals, theseArrivals...)
+		wg.Add(1)
+		go func(shot goroom.Shot) {
+			defer wg.Done()
+			theseArrivals, err := room.TraceShotUnconditional(
+				shot,
+				listenPos,
+				goroom.TraceParams{
+					Order:         config.Simulation.Order,
+					GainThreshold: config.Simulation.GainThresholdDB,
+					TimeThreshold: config.Simulation.TimeThresholdMS * MS,
+					RFZRadius:     config.Simulation.RFZRadius,
+				},
+				2000)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+				fmt.Printf("Shot origin: %v\n", shot.Ray.Origin)
+				fmt.Printf("Shot direction: %v\n", shot.Ray.Direction)
+				// Optionally: return or continue; for now, just skip bad rays
+				return
+			}
+			arrivalsChan <- theseArrivals
+		}(shot)
+	}
+
+	wg.Wait()
+	close(arrivalsChan)
+
+	arrivals := []goroom.Arrival{}
+	for rays := range arrivalsChan {
+		arrivals = append(arrivals, rays...)
 	}
 
 	// 2. Bin the arrivals
