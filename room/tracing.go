@@ -178,7 +178,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 				AllReflections:          hitPositions,
 				GainFromReflections:     gainFromReflections,
 				GainFromDistance:        gainFromDistance,
-				Gain:                    gainFromReflections * gainFromDistance,
+				Gain:                    gainFromDistance * gainFromReflections,
 				Distance:                totalDist,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
@@ -192,7 +192,7 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 // TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
 //
 // See the Params struct type.
-func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params TraceParams) ([]Arrival, error) {
+func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params TraceParams, freq float64) ([]Arrival, error) {
 	arrivals := []Arrival{}
 	mesh, err := r.mesh()
 	if err != nil {
@@ -216,7 +216,7 @@ func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params Tra
 
 		distance = distance + hit.T
 		// TODO: LOOK HERE: assuming alpha of 1000Hz is a very dangerous assumption!
-		gainFromReflections = gainFromReflections * (1 - info.Shape.(*Triangle).Surface.Material.Alpha(1000))
+		gainFromReflections = gainFromReflections * (1 - info.Shape.(*Triangle).Surface.Material.Alpha(freq))
 		gainFromDistance := 1 / math.Pow(distance/directDistance, 2)
 		totalGain := gainFromReflections * gainFromDistance
 
@@ -235,7 +235,7 @@ func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params Tra
 				AllReflections:          hitPositions,
 				GainFromReflections:     gainFromReflections,
 				GainFromDistance:        gainFromDistance,
-				Gain:                    gainFromReflections * gainFromDistance,
+				Gain:                    totalGain,
 				Distance:                distance,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: info.Position,
