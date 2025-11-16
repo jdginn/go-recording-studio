@@ -123,7 +123,20 @@ func (c SimulateCmd) Run() (err error) {
 	}
 
 	for i, t60 := range t60s {
-		fmt.Printf("T60 at %.0f Hz: %.2f ms\n", testFrequencies[i], t60/MS)
+		fmt.Printf("T60 Sabine at %.0f Hz: %.2f ms\n", testFrequencies[i], t60/MS)
+	}
+
+	t60Eyring := make([]float64, len(testFrequencies))
+	for i, freq := range testFrequencies {
+		t60, err := room.T60Eyring(freq)
+		if err != nil {
+			return err
+		}
+		t60Eyring[i] = t60
+	}
+
+	for i, t60 := range t60Eyring {
+		fmt.Printf("T60 Eyring at %.0f Hz: %.2f ms\n", testFrequencies[i], t60/MS)
 	}
 
 	// Ray tracing part
@@ -135,63 +148,43 @@ func (c SimulateCmd) Run() (err error) {
 	if err != nil {
 		return err
 	}
-	source := goroom.Source{
-		Position: sourcePos,
-		// Assume omnidirectional sources for now, so normal direction doesn't matter
-		NormalDirection: pt.Vector{1, 0, 0},
-		Name:            "Source",
-	}
-	horizSteps := int(math.Floor(math.Sqrt(float64(c.NumShots))))
-	vertSteps := c.NumShots / horizSteps
-
-	shots := make([]goroom.Shot, 0, c.NumShots)
-	for x := 0; x < horizSteps; x++ {
-		yaw := -180 + 360*(float64(x)/float64(horizSteps))
-		yawRads := yaw / 180 * math.Pi
-		for y := 0; y < vertSteps; y++ {
-			pitch := -180 + 360*(float64(y)/float64(vertSteps))
-			pitchRads := pitch / 180 * math.Pi
-			direction := source.NormalDirection.MulScalar(math.Cos(pitchRads) * math.Cos(yawRads))
-			shots = append(shots, goroom.Shot{
-				Ray: pt.Ray{
-					Origin:    sourcePos,
-					Direction: direction,
-				}, Normal: pt.Ray{
-					Origin:    sourcePos,
-					Direction: source.NormalDirection,
-				},
-				Gain:       1, // Gain always 1 because we are an omnidirectional source
-				Yaw:        yaw,
-				Pitch:      pitch,
-				SourceName: source.Name,
-			})
-		}
-	}
-
-	arrivals := make([]goroom.Arrival, 0, c.NumShots)
-	for _, shot := range shots {
-		arrival, err := room.TraceShotUnconditional(shot, listenPos, goroom.TraceParams{
-			Order:         100,
-			GainThreshold: -60,
-			TimeThreshold: 800 * MS,
-			RFZRadius:     c.ListenRadius,
-		})
+	normal := pt.Vector{1, 0, 0}
+	speakerSpec := config.Speaker.Create()
+	source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, "Source") // Normal direction doesn't matter for omnidirectional source
+	arrivals := []goroom.Arrival{}
+	totalShots := 0
+	for _, shot := range source.SampleWithNormal(normal, config.Simulation.ShotCount, 180, 180) {
+		totalShots += 1
+		theseArrivals, err := room.TraceShotUnconditional(shot, listenPos, goroom.TraceParams{
+			Order:         config.Simulation.Order,
+			GainThreshold: config.Simulation.GainThresholdDB,
+			TimeThreshold: config.Simulation.TimeThresholdMS * MS,
+			RFZRadius:     config.Simulation.RFZRadius,
+		}, 4000)
 		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			fmt.Printf("Shot origin: %v\n", shot.Ray.Origin)
+			fmt.Printf("Shot direction: %v\n", shot.Ray.Direction)
 			return err
 		}
-		arrivals = append(arrivals, arrival...)
+		arrivals = append(arrivals, theseArrivals...)
 	}
 
 	// 2. Bin the arrivals
-	binWidth := 1.0     // ms
-	maxTime := 600 * MS // last arrival time
+	binWidth := 1.0                                  // ms
+	maxTime := config.Simulation.TimeThresholdMS * 2 // last arrival time
 	binCount := int(maxTime/binWidth) + 1
 	binnedEnergy := make([]float64, binCount)
 
 	for _, arrival := range arrivals {
 		binIdx := int(arrival.ITD() / binWidth)
-		energy := math.Pow(10, arrival.Gain/10) // Convert dB to energy
+		// fmt.Printf("Arrival at time %.2f ms with gain %.5f dB goes to bin %d\n", arrival.ITD(), goroom.ToDB(arrival.Gain), binIdx)
+		energy := arrival.Gain / float64(config.Simulation.ShotCount)
+		// energy := arrival.Gain * arrival.Gain / float64(config.Simulation.ShotCount)
 		binnedEnergy[binIdx] += energy
+	}
+	for i := 0; i < binCount; i++ {
+		// fmt.Printf("Time bin %f ms: Energy %.6f\n", float64(i)*binWidth, binnedEnergy[i])
 	}
 
 	// 3. Compute reverse cumulative energy
@@ -201,6 +194,10 @@ func (c SimulateCmd) Run() (err error) {
 		total += binnedEnergy[i]
 		cumEnergy[i] = total
 	}
+
+	// for i := 0; i < binCount; i++ {
+	// 	fmt.Printf("Time bin %f ms: Cumulative Energy %.6f\n", float64(i)*binWidth, cumEnergy[i])
+	// }
 
 	// 4. Get decay curve: log10(cumEnergy), carefully handle zeroes
 	decayDB := make([]float64, binCount)
@@ -212,12 +209,16 @@ func (c SimulateCmd) Run() (err error) {
 		}
 	}
 
+	// for i := 0; i < binCount; i++ {
+	// 	fmt.Printf("Time bin %f ms: Decay dB %.2f\n", float64(i)*binWidth, decayDB[i])
+	// }
+
 	// Find dB max (start of decay)
 	maxDB := decayDB[0]
 
 	// Choose range for linear regression: -5dB to -35dB below peak
-	startThresh := maxDB - 5
-	endThresh := maxDB - 35
+	startThresh := maxDB - 10
+	endThresh := maxDB - 40
 
 	var xvals []float64 // times in ms
 	var yvals []float64 // decayDB values
