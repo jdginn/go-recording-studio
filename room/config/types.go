@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 
+	"github.com/fogleman/pt/pt"
+
 	room "github.com/jdginn/go-recording-studio/room"
 )
 
@@ -15,6 +17,7 @@ type ExperimentConfig struct {
 	Speaker            Speaker            `yaml:"speaker"`
 	ListeningTriangle  ListeningTriangle  `yaml:"listening_triangle"`
 	Simulation         Simulation         `yaml:"simulation"`
+	Decay              Decay              `yaml:"decay"`
 	Flags              Flags              `yaml:"flags"`
 	CeilingPanels      CeilingPanels      `yaml:"ceiling_panels"`
 	WallAbsorbers      WallAbsorbers      `yaml:"wall_absorbers"`
@@ -139,6 +142,33 @@ type Simulation struct {
 	Order           int     `yaml:"order"`
 	GainThresholdDB float64 `yaml:"gain_threshold_db"`
 	TimeThresholdMS float64 `yaml:"time_threshold_ms"`
+}
+
+type Decay struct {
+	TRangeMS        float64     `yaml:"t_range_ms"`
+	FreqCorners     []int       `yaml:"freq_corners"`
+	RFZRadius       float64     `yaml:"rfz_radius"`
+	ShotCount       int         `yaml:"shot_count"`
+	ShotAngleRange  float64     `yaml:"shot_angle_range"`
+	Order           int         `yaml:"order"`
+	GainThresholdDB float64     `yaml:"gain_threshold_db"`
+	TimeThresholdMS float64     `yaml:"time_threshold_ms"`
+	PointPairs      []PointPair `yaml:"point_pairs"`
+}
+
+type PointPair struct {
+	Source Point `yaml:"source"`
+	Listen Point `yaml:"listen"`
+}
+
+type Point struct {
+	X float64 `yaml:"x"`
+	Y float64 `yaml:"y"`
+	Z float64 `yaml:"z"`
+}
+
+func (p Point) ToVector() pt.Vector {
+	return pt.Vector{X: p.X, Y: p.Y, Z: p.Z}
 }
 
 type Flags struct {

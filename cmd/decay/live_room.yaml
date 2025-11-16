@@ -1,8 +1,8 @@
 input:
   mesh:
-    path: "with_reflectors.3mf"
+    # path: "with_reflectors.3mf"
     # path: "fixed_cutout.3mf"
-    # path: "live_room_empty.3mf"
+    path: "live_room_empty.3mf"
 
 materials:
   inline:
@@ -220,10 +220,14 @@ speaker:
     vertical:
       0: 0
 
-simulation:
+decay:
   rfz_radius: 0.8
   shot_count: 50000
   shot_angle_range: 360
   order: 200
-  gain_threshold_db: -40
-  time_threshold_ms: 700
+  gain_threshold_db: -70
+  time_threshold_ms: 1000
+  t_range_ms: -60
+  freq_corners: [125, 500, 1000, 2000, 4000, 8000]
+  point_pairs:
+    [source: { x: 0.5, y: 2.2, z: 0.8 }, listen: { x: 3.5, y: 2.2, z: 0.8 }]
