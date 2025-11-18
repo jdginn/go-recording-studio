@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/fogleman/pt/pt"
@@ -62,6 +65,26 @@ func parseTargetPosition(pos string) (pt.Vector, error) {
 const MS float64 = 1.0 / 1000.0
 
 const SCALE float64 = 100
+
+type ExperimentMetadata struct {
+	ConfigFile string `json:"config_file"`
+	OutputDir  string `json:"output_dir"`
+	Timestamp  string `json:"timestamp"`
+}
+type FrequencyTNResult struct {
+	FreqHz float64 `json:"freq_hz"`
+	TNMS   float64 `json:"tn_ms"`
+}
+type PointPairResult struct {
+	PointPair   string              `json:"point_pair"`
+	SourcePos   [3]float64          `json:"source_pos"`
+	ListenPos   [3]float64          `json:"listen_pos"`
+	Frequencies []FrequencyTNResult `json:"frequencies"`
+}
+type ExperimentSummary struct {
+	Experiment ExperimentMetadata `json:"experiment"`
+	Results    []PointPairResult  `json:"results"`
+}
 
 type traceParams struct {
 	ShotCount       int
@@ -358,6 +381,7 @@ var CLI struct {
 
 type SimulateCmd struct {
 	Config       string  `arg:"" name:"config" help:"config file to simulate"`
+	Mesh         string  `name:"mesh" help:"override mesh file in config"`
 	OutputDir    string  `arg:"" optional:"" name:"output-dir" help:"directory to store output in"`
 	SourcePos    string  `name:"source-pos" help:"position of the sound source in the room" default:"0.5,0.5,0.5"`
 	ListenerPos  string  `name:"listener-pos" help:"position of the listener in the room" default:"0.5,0.5,0.5"`
@@ -401,6 +425,10 @@ func (c SimulateCmd) Run() (err error) {
 		for i, fc := range config.Decay.FreqCorners {
 			testFrequencies[i] = float64(fc)
 		}
+	}
+
+	if c.Mesh != "" {
+		config.Input.Mesh.Path = c.Mesh
 	}
 
 	room, _, err := goroom.NewFrom3MF(config.Input.Mesh.Path, config.SurfaceAssignmentMap())
@@ -473,21 +501,51 @@ func (c SimulateCmd) Run() (err error) {
 	normal := pt.Vector{1, 0, 0}
 	speakerSpec := config.Speaker.Create()
 
+	summary := ExperimentSummary{
+		Experiment: ExperimentMetadata{
+			ConfigFile: c.Config,
+			OutputDir:  expDir.Path,
+			Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		},
+		Results: []PointPairResult{},
+	}
+
 	for _, pair := range config.Decay.PointPairs {
 		fmt.Printf("%s:\n", pair.Name)
 		sourcePos := pair.Source.ToVector()
 		listenPos := pair.Listen.ToVector()
 		source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, fmt.Sprintf(pair.Name+"_source")) // Normal direction doesn't matter for omnidirectional source
 
+		pairRes := PointPairResult{
+			PointPair:   pair.Name,
+			SourcePos:   [3]float64{sourcePos.X, sourcePos.Y, sourcePos.Z},
+			ListenPos:   [3]float64{listenPos.X, listenPos.Y, listenPos.Z},
+			Frequencies: []FrequencyTNResult{},
+		}
 		for _, freq := range testFrequencies {
 			arrivals := traceArrivals(room, &source, listenPos, normal, params, freq)
 
 			t60 := computeTNFromArrivals(arrivals, config.Decay)
 			fmt.Printf("\t%.0fHz Lin regression: %.2f ms\n", freq, t60)
-			plotBinnedEnergy(arrivals, config.Decay, fmt.Sprintf("%s_freq_%.0f_linreg.png", pair.Name, freq))
-			plotCumulativeEnergy(arrivals, config.Decay, fmt.Sprintf("%s_freq_%.0f_cumenergy.png", pair.Name, freq))
+			pairRes.Frequencies = append(pairRes.Frequencies, FrequencyTNResult{
+				FreqHz: freq,
+				TNMS:   t60,
+			})
 		}
+		summary.Results = append(summary.Results, pairRes)
 	}
+
+	// BEGIN: Write summary.json at end
+	summaryPath := expDir.Path + "/summary.json"
+	jsonBytes, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal summary: %w", err)
+	}
+	if err := os.WriteFile(summaryPath, jsonBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write summary.json: %w", err)
+	}
+	fmt.Printf("Summary JSON written to: %s\n", summaryPath)
+
 	return nil
 }
 
