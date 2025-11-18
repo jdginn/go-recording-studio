@@ -1,0 +1,248 @@
+input:
+  mesh:
+    # path: "with_reflectors_c.3mf"
+    # path: "fixed_cutout.3mf"
+    # path: "live_room_empty.3mf"
+    path: "live_room_d.3mf"
+
+materials:
+  inline:
+    parquette_on_concrete:
+      absorption:
+        {
+          63: 0.04,
+          125: 0.04,
+          250: 0.04,
+          500: 0.06,
+          1000: 0.08,
+          2000: 0.1,
+          4000: 0.17,
+          8000: 0.2,
+          16000: 0.2,
+        }
+    gypsum:
+      absorption:
+        {
+          63: 0.05,
+          125: 0.035,
+          250: 0.035,
+          500: 0.04,
+          1000: 0.06,
+          2000: 0.06,
+          4000: 0.06,
+          8000: 0.06,
+          16000: 0.06,
+        }
+    glass:
+      absorption:
+        {
+          125: 0.1,
+          250: 0.07,
+          500: 0.04,
+          1000: 0.03,
+          2000: 0.02,
+          4000: 0.02,
+          8000: 0.02,
+          16000: 0.02,
+        }
+    multirock_30cm:
+      absorption:
+        {
+          63: 0.58,
+          125: 0.76,
+          250: 0.88,
+          500: 0.92,
+          1000: 0.97,
+          2000: 0.99,
+          4000: 0.99,
+          8000: 0.99,
+          16000: 0.99,
+        }
+    multirock_30cm_cap_8cm_slots:
+      absorption:
+        {
+          63: 0.72,
+          125: 0.75,
+          250: 0.5,
+          500: 0.15,
+          1000: 0.2,
+          2000: 0.05,
+          4000: 0.05,
+          8000: 0.05,
+          16000: 0.05,
+        }
+    multirock_50cm_cap_8cm_slots:
+      absorption:
+        {
+          63: 0.72,
+          125: 0.75,
+          250: 0.5,
+          500: 0.15,
+          1000: 0.2,
+          2000: 0.05,
+          4000: 0.05,
+          8000: 0.05,
+          16000: 0.05,
+        }
+    airrock_nd_5cm:
+      absorption:
+        {
+          63: 0.005,
+          125: 0.09,
+          250: 0.3,
+          500: 0.57,
+          1000: 0.9,
+          2000: 0.99,
+          4000: 0.99,
+          8000: 0.99,
+          16000: 0.99,
+        }
+    airrock_nd_7cm:
+      absorption:
+        {
+          63: 0.01,
+          125: 0.15,
+          250: 0.55,
+          500: 0.84,
+          1000: 0.99,
+          2000: 0.99,
+          4000: 0.99,
+          8000: 0.99,
+          16000: 0.99,
+        }
+    50mm_ceiling_comp:
+      # 4cm airrock HD + 1cm gap + 2mm slat 100/225mm
+      absorption:
+        {
+          63: 0.05,
+          125: 0.08,
+          250: 0.3,
+          500: 0.9,
+          1000: 0.83,
+          2000: 0.7,
+          4000: 0.4,
+          8000: 0.2,
+          16000: 0.1,
+        }
+    35mm_ceiling_comp:
+      # 30mm airrock HD + 5mm gap + 2mm slat 75/275mm
+      absorption:
+        {
+          63: 0.05,
+          125: 0.06,
+          250: 0.74,
+          500: 0.5,
+          1000: 0.7,
+          2000: 0.5,
+          4000: 0.22,
+          8000: 0.1,
+          16000: 0.06,
+        }
+    10cm_wall_comp:
+      # 70mm airrock ND + 10mm gap + 10mm slat 10/300mm
+      absorption:
+        {
+          63: 0.18,
+          125: 0.8,
+          250: 0.3,
+          500: 0.18,
+          1000: 0.05,
+          2000: 0.05,
+          4000: 0.05,
+          8000: 0.05,
+          16000: 0.05,
+        }
+    17cm_wall_comp:
+      # 150mm airrock ND + 10mm gap + 10mm slat 10/300mm
+      absorption:
+        {
+          63: 0.5,
+          125: 0.7,
+          250: 0.3,
+          500: 0.18,
+          1000: 0.1,
+          2000: 0.05,
+          4000: 0.05,
+          8000: 0.05,
+          16000: 0.05,
+        }
+    wood:
+      absorption:
+        { 125: 0.25, 250: 0.05, 500: 0.04, 1000: 0.03, 2000: 0.03, 4000: 0.02 }
+
+surface_assignments:
+  inline:
+    default: "gypsum"
+    Floor: "parquette_on_concrete"
+    Window: "glass"
+    # Front Wall: "multirock_30cm"
+    l_reflector_0: "wood"
+    l_reflector_1: "wood"
+    l_reflector_2: "wood"
+    l_reflector_3: "wood"
+    l_reflector_4: "wood"
+    l_reflector_5: "wood"
+    l_reflector_6: "wood"
+    l_absorber_0: "multirock_30cm"
+    l_absorber_1: "multirock_30cm"
+    l_absorber_2: "multirock_30cm"
+    l_absorber_3: "multirock_30cm"
+    l_absorber_4: "multirock_30cm"
+    l_absorber_5: "multirock_30cm"
+    l_absorber_6: "multirock_30cm"
+    r_reflector_0: "wood"
+    r_reflector_1: "wood"
+    r_reflector_2: "wood"
+    r_reflector_3: "wood"
+    r_reflector_4: "wood"
+    r_reflector_5: "wood"
+    r_reflector_6: "wood"
+    r_absorber_0: "multirock_30cm"
+    r_absorber_1: "multirock_30cm"
+    r_absorber_2: "multirock_30cm"
+    r_absorber_3: "multirock_30cm"
+    r_absorber_4: "multirock_30cm"
+    r_absorber_5: "multirock_30cm"
+    r_absorber_6: "multirock_30cm"
+    # Street Floor Absorber Face: "multirock_30cm"
+    # Hall Floor Absorber Face: "multirock_30cm"
+    # Street Floor Absorber Top: "multirock_30cm_cap_8cm_slots"
+    # Hall Floor Absorber Top: "multirock_30cm_cap_8cm_slots"
+    Ceiling: "airrock_nd_5cm"
+speaker:
+  model: "omni"
+  dimensions:
+    x: 0.325
+    y: 0.320
+    z: 0.345
+  offset:
+    y: 0.1625
+    z: 0.725
+  directivity:
+    horizontal:
+      0: 0
+    vertical:
+      0: 0
+
+decay:
+  rfz_radius: 0.8
+  shot_count: 100000
+  shot_angle_range: 360
+  order: 200
+  gain_threshold_db: -80
+  time_threshold_ms: 550
+  t_range_ms: -30
+  freq_corners: [125, 500, 1000, 2000, 4000, 8000]
+  point_pairs:
+    - name: "live"
+      source: { x: 0.5, y: 2.2, z: 0.8 }
+      listen: { x: 1.0, y: 2.2, z: 0.9 }
+    - name: "dead"
+      source: { x: 4.0, y: 2.2, z: 0.8 }
+      listen: { x: 3.5, y: 2.2, z: 0.9 }
+    # - name: "live"
+    #   source: { x: 2.5, y: 2.2, z: 0.8 }
+    #   listen: { x: 3.7, y: 2.2, z: 0.8 }
+    # - name: "dead"
+    #   source: { x: 2.5, y: 2.2, z: 0.8 }
+    #   listen: { x: 0.4, y: 2.2, z: 0.8 }
