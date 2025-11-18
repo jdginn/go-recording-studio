@@ -157,8 +157,9 @@ type Decay struct {
 }
 
 type PointPair struct {
-	Source Point `yaml:"source"`
-	Listen Point `yaml:"listen"`
+	Name   string `yaml:"name,omitempty"`
+	Source Point  `yaml:"source"`
+	Listen Point  `yaml:"listen"`
 }
 
 type Point struct {

@@ -1,8 +1,10 @@
 input:
   mesh:
-    # path: "with_reflectors.3mf"
+    # path: "with_reflectors_c.3mf"
     # path: "fixed_cutout.3mf"
-    path: "live_room_empty.3mf"
+    # path: "live_room_empty.3mf"
+    # path: "live_room_d.3mf"
+    path: "foo.3mf"
 
 materials:
   inline:
@@ -174,10 +176,12 @@ surface_assignments:
     default: "gypsum"
     Floor: "parquette_on_concrete"
     Window: "glass"
+    # Front Wall: "multirock_30cm"
     l_reflector_0: "wood"
     l_reflector_1: "wood"
     l_reflector_2: "wood"
     l_reflector_3: "wood"
+    l_reflector_4: "wood"
     l_reflector_5: "wood"
     l_reflector_6: "wood"
     l_absorber_0: "multirock_30cm"
@@ -191,6 +195,7 @@ surface_assignments:
     r_reflector_1: "wood"
     r_reflector_2: "wood"
     r_reflector_3: "wood"
+    r_reflector_4: "wood"
     r_reflector_5: "wood"
     r_reflector_6: "wood"
     r_absorber_0: "multirock_30cm"
@@ -204,7 +209,7 @@ surface_assignments:
     # Hall Floor Absorber Face: "multirock_30cm"
     # Street Floor Absorber Top: "multirock_30cm_cap_8cm_slots"
     # Hall Floor Absorber Top: "multirock_30cm_cap_8cm_slots"
-    # Ceiling: "airrock_nd_5cm"
+    Ceiling: "airrock_nd_5cm"
 speaker:
   model: "omni"
   dimensions:
@@ -222,12 +227,23 @@ speaker:
 
 decay:
   rfz_radius: 0.8
-  shot_count: 50000
+  shot_count: 100000
   shot_angle_range: 360
   order: 200
-  gain_threshold_db: -70
-  time_threshold_ms: 1000
-  t_range_ms: -60
+  gain_threshold_db: -80
+  time_threshold_ms: 550
+  t_range_ms: -30
   freq_corners: [125, 500, 1000, 2000, 4000, 8000]
   point_pairs:
-    [source: { x: 0.5, y: 2.2, z: 0.8 }, listen: { x: 3.5, y: 2.2, z: 0.8 }]
+    - name: "live"
+      source: { x: 0.5, y: 2.2, z: 0.8 }
+      listen: { x: 1.0, y: 2.2, z: 0.9 }
+    - name: "dead"
+      source: { x: 4.0, y: 2.2, z: 0.8 }
+      listen: { x: 3.5, y: 2.2, z: 0.9 }
+    # - name: "live"
+    #   source: { x: 2.5, y: 2.2, z: 0.8 }
+    #   listen: { x: 3.7, y: 2.2, z: 0.8 }
+    # - name: "dead"
+    #   source: { x: 2.5, y: 2.2, z: 0.8 }
+    #   listen: { x: 0.4, y: 2.2, z: 0.8 }

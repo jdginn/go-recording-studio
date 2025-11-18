@@ -9,12 +9,15 @@ require (
 	github.com/hpinc/go3mf v0.24.2
 	github.com/sgreben/piecewiselinear v1.2.0
 	github.com/stretchr/testify v1.10.0
-	gonum.org/v1/gonum v0.15.1
-	gonum.org/v1/plot v0.15.0
+	gonum.org/v1/gonum v0.16.0
+	gonum.org/v1/plot v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	codeberg.org/go-fonts/liberation v0.5.0 // indirect
+	codeberg.org/go-latex/latex v0.1.0 // indirect
+	codeberg.org/go-pdf/fpdf v0.10.0 // indirect
 	git.sr.ht/~sbinet/gg v0.6.0 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/campoy/embedmd v1.0.0 // indirect
@@ -26,7 +29,7 @@ require (
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/qmuntal/opc v0.7.10 // indirect
-	golang.org/x/image v0.23.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/image v0.25.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )

@@ -176,3 +176,26 @@ surface_assignments:
     Ceiling: "airrock_nd_5cm"
     # Back Wall: "17cm_wall_comp"
     # Hall Wall: "10cm_wall_comp"
+    #
+speaker:
+  model: "SQT"
+  dimensions:
+    x: 0.325
+    y: 0.320
+    z: 0.345
+  offset:
+    y: 0.1625
+    z: 0.725
+  directivity:
+    horizontal:
+      0: 0
+    vertical:
+      0: 0
+
+simulation:
+  rfz_radius: 0.5
+  shot_count: 200000
+  shot_angle_range: 360
+  order: 200
+  gain_threshold_db: -500
+  time_threshold_ms: 800

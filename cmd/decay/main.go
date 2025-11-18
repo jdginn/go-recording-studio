@@ -10,6 +10,9 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/fogleman/pt/pt"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
 
 	goroom "github.com/jdginn/go-recording-studio/room"
 	roomConfig "github.com/jdginn/go-recording-studio/room/config"
@@ -88,9 +91,9 @@ func traceArrivals(room *goroom.Room, source *goroom.Speaker, listenPos pt.Vecto
 					RFZRadius:     config.RFZRadius,
 				}, freq)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				fmt.Printf("Shot origin: %v\n", shot.Ray.Origin)
-				fmt.Printf("Shot direction: %v\n", shot.Ray.Direction)
+				// fmt.Printf("Error: %v\n", err)
+				// fmt.Printf("Shot origin: %v\n", shot.Ray.Origin)
+				// fmt.Printf("Shot direction: %v\n", shot.Ray.Direction)
 				// Optionally: return or continue; for now, just skip bad rays
 				return
 			}
@@ -108,7 +111,7 @@ func traceArrivals(room *goroom.Room, source *goroom.Speaker, listenPos pt.Vecto
 	return arrivals
 }
 
-func computeT60FromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) float64 {
+func computeTNFromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) float64 {
 	// 2. Bin the arrivals
 	binWidth := 1.0                       // ms
 	maxTime := config.TimeThresholdMS * 2 // last arrival time
@@ -146,9 +149,9 @@ func computeT60FromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) 
 		}
 	}
 
-	// Choose range for linear regression: -10dB to -50dB below peak
-	startThresh := maxDB - 10
-	endThresh := maxDB - 50
+	// Choose range for linear regression: -5dB to -10dB above target
+	startThresh := maxDB
+	endThresh := maxDB + config.TRangeMS + 10
 
 	var xvals []float64 // times in ms
 	var yvals []float64 // decayDB values
@@ -172,9 +175,181 @@ func computeT60FromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) 
 	}
 	slope := (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX)
 
-	// Finally, T60 calculation
-	T60 := 60.0 / math.Abs(slope) // T60 in ms (if binWidth is ms)
-	return T60
+	// Finally, TN calculation
+	TN := -config.TRangeMS / math.Abs(slope) // T60 in ms (if binWidth is ms)
+	return TN
+}
+
+func computeTNFromArrivalsDirectInterval(arrivals []goroom.Arrival, config roomConfig.Decay) float64 {
+	// 2. Bin the arrivals
+	binWidth := 1.0                       // ms
+	maxTime := config.TimeThresholdMS * 2 // last arrival time
+	binCount := int(maxTime/binWidth) + 1
+	binnedEnergy := make([]float64, binCount)
+
+	for _, arrival := range arrivals {
+		binIdx := int(arrival.ITD() / binWidth)
+		energy := arrival.Gain / float64(config.ShotCount)
+		binnedEnergy[binIdx] += energy
+	}
+	// 3. Compute reverse cumulative energy
+	cumEnergy := make([]float64, binCount)
+	total := 0.0
+	for i := binCount - 1; i >= 0; i-- {
+		total += binnedEnergy[i]
+		cumEnergy[i] = total
+	}
+
+	// 4. Get decay curve: log10(cumEnergy), carefully handle zeroes
+	decayDB := make([]float64, binCount)
+	for i, e := range cumEnergy {
+		if e > 0 {
+			decayDB[i] = 10 * math.Log10(e)
+		} else {
+			decayDB[i] = -1000 // or some large negative value
+		}
+	}
+
+	// Find dB max (start of decay)
+	maxDB := decayDB[0]
+	maxIdx := 0
+	for i := 1; i < binCount; i++ {
+		if decayDB[i] > maxDB {
+			maxDB = decayDB[i]
+			maxIdx = i
+		}
+	}
+
+	targetDB := maxDB + config.TRangeMS // e.g., TRangeMS = 30 for TN30, 50 for TN50
+	// targetIdx := -1
+	for i := maxIdx; i < binCount; i++ {
+		if decayDB[i] <= targetDB {
+			// targetIdx = i
+			break
+		}
+	}
+
+	// Find bins i (above) and i+1 (below threshold)
+	for i := maxIdx; i < binCount-1; i++ {
+		if decayDB[i] >= targetDB && decayDB[i+1] < targetDB {
+			t1 := float64(i) * binWidth
+			t2 := float64(i+1) * binWidth
+			d1 := decayDB[i]
+			d2 := decayDB[i+1]
+			// Linear interpolation for exact crossing time
+			decayTime := t1 + (targetDB-d1)/(d2-d1)*(t2-t1)
+			return decayTime
+		}
+	}
+
+	// // If we found a valid interval
+	// if targetIdx != -1 && targetIdx > maxIdx {
+	// 	TN := float64(targetIdx-maxIdx) * binWidth // time to decay by config.TRangeMS dB
+	// 	return TN
+	// }
+
+	// Else, not enough decay in simulation window
+	return -1
+}
+
+func plotBinnedEnergy(arrivals []goroom.Arrival, config roomConfig.Decay, filename string) {
+	// 2. Bin the arrivals
+	binWidth := 0.1                       // ms
+	maxTime := config.TimeThresholdMS * 2 // last arrival time
+	binCount := int(maxTime/binWidth) + 1
+	binnedEnergy := make([]float64, binCount)
+
+	for _, arrival := range arrivals {
+		binIdx := int(arrival.ITD() / binWidth)
+		energy := arrival.Gain
+		binnedEnergy[binIdx] += energy
+	}
+
+	p := plot.New()
+	p.Title.Text = "Binned Arrival Energy"
+	p.X.Label.Text = "Time (ms)"
+	p.Y.Label.Text = "Energy in Bin"
+
+	pts := make(plotter.XYs, len(binnedEnergy))
+	db := 0.0
+	var last float64
+	for i := 0; i < int(250.0/binWidth); i++ {
+		e := binnedEnergy[i]
+		if e > 0 {
+			db = 10 * math.Log10(e)
+			last = db
+			pts[i].X = float64(i) * binWidth
+			pts[i].Y = db
+		} else {
+			pts[i].X = float64(i) * binWidth
+			pts[i].Y = last
+		}
+	}
+
+	bar, err := plotter.NewLine(pts) // Use NewLine for energy over time; for true bar chart use plotter.NewBarChart
+	if err != nil {
+		log.Fatalf("error creating plot line: %v", err)
+	}
+	p.Add(bar)
+	p.Add(plotter.NewGrid())
+	if err := p.Save(8*vg.Inch, 5*vg.Inch, filename); err != nil {
+		log.Fatalf("error saving plot: %v", err)
+	}
+}
+
+func plotCumulativeEnergy(arrivals []goroom.Arrival, config roomConfig.Decay, filename string) {
+	// 2. Bin the arrivals
+	binWidth := 0.1                       // ms
+	maxTime := config.TimeThresholdMS * 2 // last arrival time
+	binCount := int(maxTime/binWidth) + 1
+	binnedEnergy := make([]float64, binCount)
+
+	for _, arrival := range arrivals {
+		binIdx := int(arrival.ITD() / binWidth)
+		energy := arrival.Gain
+		binnedEnergy[binIdx] += energy
+	}
+
+	// 3. Compute reverse cumulative energy
+	cumEnergy := make([]float64, binCount)
+	total := 0.0
+	for i := binCount - 1; i >= 0; i-- {
+		total += binnedEnergy[i]
+		cumEnergy[i] = total
+	}
+
+	p := plot.New()
+	p.Title.Text = "Cumulative Arrival Energy"
+	p.X.Label.Text = "Time (ms)"
+	p.Y.Label.Text = "Cumulative Energy"
+
+	pts := make(plotter.XYs, len(cumEnergy))
+	db := -60.0
+
+	// t20 := computeTNFromArrivals(arrivals, config)
+	for i := 0; i < int(250.0/binWidth); i++ {
+		e := cumEnergy[i]
+		if e > 0 {
+			db = 10 * math.Log10(e)
+			pts[i].X = float64(i) * binWidth
+			pts[i].Y = db
+		} else {
+			pts[i].X = float64(i) * binWidth
+			pts[i].Y = -60.0
+		}
+	}
+
+	bar, err := plotter.NewLine(pts) // Use NewLine for energy over time; for true bar chart use plotter.NewBarChart
+	if err != nil {
+		log.Fatalf("error creating plot line: %v", err)
+	}
+	p.Add(bar)
+	p.Add(plotter.NewGrid())
+	p.Y.Max = 30.0
+	p.Y.Min = -60.0
+	if err := p.Save(8*vg.Inch, 5*vg.Inch, filename); err != nil {
+		log.Fatalf("error saving plot: %v", err)
+	}
 }
 
 var CLI struct {
@@ -268,33 +443,50 @@ func (c SimulateCmd) Run() (err error) {
 		t60Eyring[i] = t60
 	}
 
+	fmt.Println("Sabine:")
+	for i, freq := range testFrequencies {
+		fmt.Printf("\t%.0fHz: %.2f ms\n", freq, t60Sabine[i]/MS)
+	}
+	fmt.Printf("\n")
+	fmt.Println("Eyring:")
+	for i, freq := range testFrequencies {
+		fmt.Printf("\t%.0fHz: %.2f ms\n", freq, t60Eyring[i]/MS)
+	}
+	fmt.Printf("\n")
+
 	// Ray tracing part
-	sourcePos := config.Decay.PointPairs[0].Source.ToVector()
-	listenPos := config.Decay.PointPairs[0].Listen.ToVector()
-	normal := pt.Vector{1, 0, 0}
-	speakerSpec := config.Speaker.Create()
-	source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, "Source") // Normal direction doesn't matter for omnidirectional source
 
 	params := traceParams{
-		ShotCount:       c.NumShots,
+		ShotCount:       config.Decay.ShotCount,
 		Order:           config.Decay.Order,
 		GainThresholdDB: config.Decay.GainThresholdDB,
 		TimeThresholdMS: config.Decay.TimeThresholdMS,
 		RFZRadius:       config.Decay.RFZRadius,
 	}
+
 	// if params.GainThresholdDB > (config.Decay.TRangeMS - 10.0) {
 	// 	params.GainThresholdDB = config.Decay.TRangeMS - 10.0
 	// }
 	// Override the simulation threshold to a safe but efficient setting
 	params.GainThresholdDB = config.Decay.TRangeMS - 10.0
 
-	for i, freq := range testFrequencies {
-		arrivals := traceArrivals(room, &source, listenPos, normal, params, freq)
+	normal := pt.Vector{1, 0, 0}
+	speakerSpec := config.Speaker.Create()
 
-		t60 := computeT60FromArrivals(arrivals, config.Decay)
-		fmt.Printf("Sabine at %.0fHz: %.2f ms\n", freq, t60Sabine[i]/MS)
-		fmt.Printf("Eyering at %.0fHz: %.2f ms\n", freq, t60Eyring[i]/MS)
-		fmt.Printf("Ray tracing at %.0fHz: %.2f ms\n\n", freq, t60)
+	for _, pair := range config.Decay.PointPairs {
+		fmt.Printf("%s:\n", pair.Name)
+		sourcePos := pair.Source.ToVector()
+		listenPos := pair.Listen.ToVector()
+		source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, fmt.Sprintf(pair.Name+"_source")) // Normal direction doesn't matter for omnidirectional source
+
+		for _, freq := range testFrequencies {
+			arrivals := traceArrivals(room, &source, listenPos, normal, params, freq)
+
+			t60 := computeTNFromArrivals(arrivals, config.Decay)
+			fmt.Printf("\t%.0fHz Lin regression: %.2f ms\n", freq, t60)
+			plotBinnedEnergy(arrivals, config.Decay, fmt.Sprintf("%s_freq_%.0f_linreg.png", pair.Name, freq))
+			plotCumulativeEnergy(arrivals, config.Decay, fmt.Sprintf("%s_freq_%.0f_cumenergy.png", pair.Name, freq))
+		}
 	}
 	return nil
 }
