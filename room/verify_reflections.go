@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/fogleman/pt/pt"
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 // Constants for verification

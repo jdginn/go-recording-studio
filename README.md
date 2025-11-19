@@ -236,6 +236,5 @@ MIT License (see LICENSE)
 
 ## Acknowledgments
 
-- Uses the [fogleman/pt](https://github.com/fogleman/pt) package for ray tracing
+- Uses a modified version of the [fogleman/pt](https://github.com/fogleman/pt) package for ray tracing
 - Uses [kong](https://github.com/alecthomas/kong) for CLI argument parsing
-

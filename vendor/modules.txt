@@ -46,15 +46,6 @@ github.com/davecgh/go-spew/spew
 # github.com/fogleman/gg v1.3.0
 ## explicit
 github.com/fogleman/gg
-# github.com/fogleman/pt v0.0.0-20170619012416-6fa0015c2178
-## explicit
-github.com/fogleman/pt/pt
-# github.com/go-fonts/liberation v0.3.3
-## explicit; go 1.19
-# github.com/go-latex/latex v0.0.0-20240709081214-31cef3c7570e
-## explicit; go 1.21
-# github.com/go-pdf/fpdf v0.9.0
-## explicit; go 1.20
 # github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 ## explicit
 github.com/golang/freetype/raster

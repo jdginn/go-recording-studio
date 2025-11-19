@@ -3,8 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/fogleman/pt/pt"
-
+	"github.com/jdginn/go-recording-studio/pt"
 	room "github.com/jdginn/go-recording-studio/room"
 )
 

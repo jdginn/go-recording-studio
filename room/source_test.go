@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/fogleman/pt/pt"
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 type pp struct {

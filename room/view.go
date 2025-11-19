@@ -14,7 +14,8 @@ import (
 	"gonum.org/v1/plot/vg"
 
 	"github.com/fogleman/gg"
-	"github.com/fogleman/pt/pt"
+
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 type Size struct {

@@ -3,7 +3,7 @@ package room
 import (
 	"math"
 
-	"github.com/fogleman/pt/pt"
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 // Value from Rod Gervais' book Home Recording Studio: Build It Like The Pros

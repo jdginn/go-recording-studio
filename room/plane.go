@@ -3,7 +3,7 @@ package room
 import (
 	"math"
 
-	"github.com/fogleman/pt/pt"
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 // Most of this code is taken from https://github.com/fogleman/choppy/tree/master with some modifications

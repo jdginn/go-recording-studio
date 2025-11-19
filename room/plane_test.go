@@ -5,8 +5,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/fogleman/pt/pt"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 func buildTri(v1, v2, v3 pt.Vector) *pt.Triangle {

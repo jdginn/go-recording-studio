@@ -2,9 +2,9 @@ input:
   mesh:
     # path: "with_reflectors_c.3mf"
     # path: "fixed_cutout.3mf"
-    # path: "live_room_empty.3mf"
+    path: "live_room.3mf"
     # path: "live_room_d.3mf"
-    path: "foo.3mf"
+    # path: "foo.3mf"
 
 materials:
   inline:

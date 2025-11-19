@@ -3,7 +3,7 @@
 
 package room
 
-import "github.com/fogleman/pt/pt"
+import "github.com/jdginn/go-recording-studio/pt"
 
 // Empty stub that will be optimized out
 func verifyReflectionLaw(incident pt.Ray, normal pt.Vector, reflected pt.Ray) {

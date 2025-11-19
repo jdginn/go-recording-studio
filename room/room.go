@@ -5,9 +5,10 @@ import (
 	"math"
 	"sort"
 
-	"github.com/fogleman/pt/pt"
 	"github.com/hpinc/go3mf"
 	lin "github.com/sgreben/piecewiselinear"
+
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 type Material struct {

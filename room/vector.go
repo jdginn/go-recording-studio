@@ -1,7 +1,7 @@
 package room
 
 import (
-	"github.com/fogleman/pt/pt"
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 // V is a shorthand constructor for pt.Vector

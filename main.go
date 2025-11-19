@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/fogleman/pt/pt"
 
+	"github.com/jdginn/go-recording-studio/pt"
 	goroom "github.com/jdginn/go-recording-studio/room"
 	roomConfig "github.com/jdginn/go-recording-studio/room/config"
 	roomExperiment "github.com/jdginn/go-recording-studio/room/experiment"

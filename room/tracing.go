@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/fogleman/pt/pt"
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 // TraceParams contains parameters to guide tracing

@@ -9,8 +9,9 @@ import (
 	"gonum.org/v1/gonum/num/quat"
 	"gonum.org/v1/gonum/spatial/r3"
 
-	"github.com/fogleman/pt/pt"
 	lin "github.com/sgreben/piecewiselinear"
+
+	"github.com/jdginn/go-recording-studio/pt"
 )
 
 type Shot struct {

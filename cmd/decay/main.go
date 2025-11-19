@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/fogleman/pt/pt"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 
+	"github.com/jdginn/go-recording-studio/pt"
 	goroom "github.com/jdginn/go-recording-studio/room"
 	roomConfig "github.com/jdginn/go-recording-studio/room/config"
 	roomExperiment "github.com/jdginn/go-recording-studio/room/experiment"
