@@ -106,7 +106,7 @@ func traceArrivals(room *goroom.Room, source *goroom.Speaker, listenPos pt.Vecto
 			defer wg.Done()
 			theseArrivals, err := room.TraceShotUnconditional(
 				shot,
-				listenPos,
+				goroom.Omni{Pos: listenPos},
 				goroom.TraceParams{
 					Order:         config.Order,
 					GainThreshold: config.GainThresholdDB,
