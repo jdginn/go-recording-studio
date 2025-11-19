@@ -17,6 +17,7 @@ import (
 	"gonum.org/v1/plot/vg"
 
 	"github.com/jdginn/go-recording-studio/pt"
+	"github.com/jdginn/go-recording-studio/room"
 	goroom "github.com/jdginn/go-recording-studio/room"
 	roomConfig "github.com/jdginn/go-recording-studio/room/config"
 	roomExperiment "github.com/jdginn/go-recording-studio/room/experiment"
@@ -72,18 +73,19 @@ type ExperimentMetadata struct {
 	Timestamp  string `json:"timestamp"`
 }
 type FrequencyTNResult struct {
-	FreqHz float64 `json:"freq_hz"`
-	TNMS   float64 `json:"tn_ms"`
+	T20MS            float64 `json:"t20_ms"`
+	T30MS            float64 `json:"t30_ms"`
+	EchoDensityScore float64 `json:"echo_density_score"`
+	TemporalKurtosis float64 `json:"temporal_kurtosis"`
 }
 type PointPairResult struct {
-	PointPair   string              `json:"point_pair"`
-	SourcePos   [3]float64          `json:"source_pos"`
-	ListenPos   [3]float64          `json:"listen_pos"`
-	Frequencies []FrequencyTNResult `json:"frequencies"`
+	SourcePos   [3]float64                `json:"source_pos"`
+	Microphone  room.Microphone           `json:"microphone"`
+	Frequencies map[int]FrequencyTNResult `json:"frequencies"`
 }
 type ExperimentSummary struct {
-	Experiment ExperimentMetadata `json:"experiment"`
-	Results    []PointPairResult  `json:"results"`
+	Experiment ExperimentMetadata         `json:"experiment"`
+	Results    map[string]PointPairResult `json:"results"`
 }
 
 type traceParams struct {
@@ -94,7 +96,7 @@ type traceParams struct {
 	RFZRadius       float64
 }
 
-func traceArrivals(room *goroom.Room, source *goroom.Speaker, listenPos pt.Vector, normal pt.Vector, config traceParams, freq float64) []goroom.Arrival {
+func traceArrivals(room *goroom.Room, source *goroom.Speaker, mic room.Microphone, normal pt.Vector, config traceParams, freq float64) []goroom.Arrival {
 	arrivalsChan := make(chan []goroom.Arrival, config.ShotCount)
 
 	// Do this per frequency corner
@@ -106,7 +108,7 @@ func traceArrivals(room *goroom.Room, source *goroom.Speaker, listenPos pt.Vecto
 			defer wg.Done()
 			theseArrivals, err := room.TraceShotUnconditional(
 				shot,
-				goroom.Omni{Pos: listenPos},
+				mic,
 				goroom.TraceParams{
 					Order:         config.Order,
 					GainThreshold: config.GainThresholdDB,
@@ -134,7 +136,7 @@ func traceArrivals(room *goroom.Room, source *goroom.Speaker, listenPos pt.Vecto
 	return arrivals
 }
 
-func computeTNFromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) float64 {
+func computeTNFromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay, tRangeMS float64) float64 {
 	// 2. Bin the arrivals
 	binWidth := 1.0                       // ms
 	maxTime := config.TimeThresholdMS * 2 // last arrival time
@@ -174,7 +176,7 @@ func computeTNFromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) f
 
 	// Choose range for linear regression: -5dB to -10dB above target
 	startThresh := maxDB
-	endThresh := maxDB + config.TRangeMS + 10
+	endThresh := maxDB + tRangeMS + 10
 
 	var xvals []float64 // times in ms
 	var yvals []float64 // decayDB values
@@ -199,8 +201,180 @@ func computeTNFromArrivals(arrivals []goroom.Arrival, config roomConfig.Decay) f
 	slope := (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX)
 
 	// Finally, TN calculation
-	TN := -config.TRangeMS / math.Abs(slope) // T60 in ms (if binWidth is ms)
+	TN := -tRangeMS / math.Abs(slope) // T60 in ms (if binWidth is ms)
+	// Guard against resulting Inf/NaN
+	if math.IsInf(TN, 0) || math.IsNaN(TN) {
+		return -1
+	}
 	return TN
+}
+
+// computeEchoDensity computes the arrival-rate coefficient of variation (CV) and a normalized diffusion score.
+// - arrivals: list of arrivals
+// - config: provides ShotCount and TimeThresholdMS (same as your other fn)
+// - windowStartMS, windowEndMS: time window to consider (e.g., 10..120 ms)
+// - binWidthMS: bin width in ms (e.g., 1.0)
+// Returns (cv, score) where score in (0,1], larger => more diffuse
+func computeEchoDensity(arrivals []goroom.Arrival, config roomConfig.Decay, windowStartMS, windowEndMS, binWidthMS float64) (float64, float64) {
+	if windowEndMS <= windowStartMS {
+		return math.NaN(), 0
+	}
+	binCount := int(math.Ceil((windowEndMS - windowStartMS) / binWidthMS))
+	if binCount <= 0 {
+		return math.NaN(), 0
+	}
+	counts := make([]float64, binCount)
+	energyCounts := make([]float64, binCount)
+
+	for _, a := range arrivals {
+		t := a.ITD()
+		if t < windowStartMS || t >= windowEndMS {
+			continue
+		}
+		idx := int((t - windowStartMS) / binWidthMS)
+		if idx < 0 || idx >= binCount {
+			continue
+		}
+		counts[idx] += 1.0
+		// energy-weighted count (use the same normalization you use elsewhere)
+		energy := a.Gain / float64(config.ShotCount)
+		energyCounts[idx] += energy
+	}
+
+	// choose whether to use simple counts or energyCounts; I'll compute both CVs
+	meanCount := 0.0
+	for _, v := range counts {
+		meanCount += v
+	}
+	meanCount /= float64(binCount)
+
+	var varCount float64
+	for _, v := range counts {
+		d := v - meanCount
+		varCount += d * d
+	}
+	varCount /= float64(binCount)
+	stdCount := math.Sqrt(varCount)
+
+	// energy-weighted version
+	meanE := 0.0
+	for _, v := range energyCounts {
+		meanE += v
+	}
+	meanE /= float64(binCount)
+	varE := 0.0
+	for _, v := range energyCounts {
+		d := v - meanE
+		varE += d * d
+	}
+	varE /= float64(binCount)
+	stdE := math.Sqrt(varE)
+
+	// CV: Coefficient of variation. Guard against divide-by-zero.
+	cv := math.Inf(1)
+	if meanCount > 0 {
+		cv = stdCount / meanCount
+	}
+	cvEnergy := math.Inf(1)
+	if meanE > 0 {
+		cvEnergy = stdE / meanE
+	}
+
+	// Choose which CV to return/use. energy-weighted is often more perceptually meaningful.
+	useCV := cvEnergy
+	if math.IsInf(useCV, 1) || math.IsNaN(useCV) {
+		useCV = cv
+	}
+	if math.IsInf(useCV, 1) || math.IsNaN(useCV) {
+		// no arrivals in window -> extremely non-diffuse
+		return math.Inf(1), 0.0
+	}
+
+	// Map CV -> normalized diffusion score in (0,1]
+	// simple mapping: score = 1 / (1 + CV)
+	score := 1.0 / (1.0 + useCV)
+	// alternative (sharper): score = math.Exp(-k*useCV)
+	// if you want stronger compression adjust k.
+
+	return useCV, score
+}
+
+// computeTemporalKurtosis computes the excess kurtosis of the energy-per-bin distribution
+// and returns a normalized diffusion score (higher means less spiky -> more diffuse).
+// - windowStartMS/windowEndMS/binWidthMS same meaning.
+// Returns (excessKurtosis, score) where score in (0,1], larger => more diffuse.
+func computeTemporalKurtosis(arrivals []goroom.Arrival, config roomConfig.Decay, windowStartMS, windowEndMS, binWidthMS float64) (float64, float64) {
+	if windowEndMS <= windowStartMS {
+		return math.NaN(), 0
+	}
+	binCount := int(math.Ceil((windowEndMS - windowStartMS) / binWidthMS))
+	if binCount <= 0 {
+		return math.NaN(), 0
+	}
+	energyBins := make([]float64, binCount)
+
+	for _, a := range arrivals {
+		t := a.ITD()
+		if t < windowStartMS || t >= windowEndMS {
+			continue
+		}
+		idx := int((t - windowStartMS) / binWidthMS)
+		if idx < 0 || idx >= binCount {
+			continue
+		}
+		energy := a.Gain / float64(config.ShotCount)
+		energyBins[idx] += energy
+	}
+
+	// If no energy, return non-diffuse
+	totalEnergy := 0.0
+	for _, e := range energyBins {
+		totalEnergy += e
+	}
+	if totalEnergy <= 0 {
+		return math.NaN(), 0.0
+	}
+
+	// Optionally smooth energyBins slightly to reduce single-bin shot noise (simple moving average).
+	// Uncomment if desired:
+	// energyBins = smooth(energyBins, 1)
+
+	// compute moments
+	mean := 0.0
+	for _, e := range energyBins {
+		mean += e
+	}
+	mean /= float64(binCount)
+
+	m2 := 0.0
+	m4 := 0.0
+	for _, e := range energyBins {
+		d := e - mean
+		m2 += d * d
+		m4 += d * d * d * d
+	}
+	m2 /= float64(binCount)
+	m4 /= float64(binCount)
+
+	// guard against zero variance
+	if m2 <= 0 {
+		return 0.0, 1.0 // perfectly flat -> maximally diffuse
+	}
+
+	// kurtosis (Pearson definition)
+	kurtosis := m4 / (m2 * m2)
+	excess := kurtosis - 3.0 // excess kurtosis (0 for normal)
+
+	// clamp negative excess (platykurtic) to zero for mapping, since negative means even smoother-than-normal
+	if excess < 0 {
+		excess = 0
+	}
+
+	// Map excess kurtosis -> diffusion score. Larger excess -> more spiky -> lower score.
+	score := 1.0 / (1.0 + excess) // simple mapping in (0,1]
+	// alternative: score = math.Exp(-alpha * excess)
+
+	return excess, score
 }
 
 func computeTNFromArrivalsDirectInterval(arrivals []goroom.Arrival, config roomConfig.Decay) float64 {
@@ -507,35 +681,41 @@ func (c SimulateCmd) Run() (err error) {
 			OutputDir:  expDir.Path,
 			Timestamp:  time.Now().UTC().Format(time.RFC3339),
 		},
-		Results: []PointPairResult{},
+		Results: map[string]PointPairResult{},
 	}
 
 	for _, pair := range config.Decay.PointPairs {
 		fmt.Printf("%s:\n", pair.Name)
 		sourcePos := pair.Source.ToVector()
-		listenPos := pair.Listen.ToVector()
+		mic := pair.Microphone.Unmarshal()
 		source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, fmt.Sprintf(pair.Name+"_source")) // Normal direction doesn't matter for omnidirectional source
 
 		pairRes := PointPairResult{
-			PointPair:   pair.Name,
 			SourcePos:   [3]float64{sourcePos.X, sourcePos.Y, sourcePos.Z},
-			ListenPos:   [3]float64{listenPos.X, listenPos.Y, listenPos.Z},
-			Frequencies: []FrequencyTNResult{},
+			Frequencies: map[int]FrequencyTNResult{},
+			Microphone:  mic,
 		}
 		for _, freq := range testFrequencies {
-			arrivals := traceArrivals(room, &source, listenPos, normal, params, freq)
+			arrivals := traceArrivals(room, &source, mic, normal, params, freq)
 
-			t60 := computeTNFromArrivals(arrivals, config.Decay)
-			fmt.Printf("\t%.0fHz Lin regression: %.2f ms\n", freq, t60)
-			pairRes.Frequencies = append(pairRes.Frequencies, FrequencyTNResult{
-				FreqHz: freq,
-				TNMS:   t60,
-			})
+			t30 := computeTNFromArrivals(arrivals, config.Decay, -30)
+			t20 := computeTNFromArrivals(arrivals, config.Decay, -20)
+			_, echoDensity := computeEchoDensity(arrivals, config.Decay, 20.0, 120.0, 1.0)
+			_, kurtosisScore := computeTemporalKurtosis(arrivals, config.Decay, 20.0, 120.0, 1.0)
+			fmt.Printf("\tT30: %.0fHz: %.2f ms\n", freq, t30)
+			fmt.Printf("\tT20: %.0fHz: %.2f ms\n", freq, t20)
+			fmt.Printf("\tEcho density   %.0fHz: %.2f\n", freq, echoDensity)
+			fmt.Printf("\tKurtosis score %.0fHz: %.2f\n", freq, kurtosisScore)
+			pairRes.Frequencies[int(freq)] = FrequencyTNResult{
+				T20MS:            t20,
+				T30MS:            t30,
+				EchoDensityScore: echoDensity,
+				TemporalKurtosis: kurtosisScore,
+			}
 		}
-		summary.Results = append(summary.Results, pairRes)
+		summary.Results[pair.Name] = pairRes
 	}
 
-	// BEGIN: Write summary.json at end
 	summaryPath := expDir.Path + "/summary.json"
 	jsonBytes, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {

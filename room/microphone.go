@@ -49,9 +49,10 @@ func (c Cardioid) DirectionalGain(rayDir pt.Vector) float64 {
 	micNormal := c.Normal.Normalize()
 	rayDirection := rayDir.Normalize()
 
-	// Calculate cosine of angle between ray direction and microphone normal
-	// Note: We want the angle between the ray direction and the mic's "listening" direction
-	cosTheta := micNormal.Dot(rayDirection)
+	// rayDirection points from source toward the mic, so the front-facing case
+	// corresponds to rayDirection being opposite micNormal. Use the negative
+	// so cosTheta==1 means perfectly on-axis front arrival.
+	cosTheta := -micNormal.Dot(rayDirection)
 
 	// Use default BackDB of -24 dB if not set (or if set to 0)
 	backDB := c.BackDB

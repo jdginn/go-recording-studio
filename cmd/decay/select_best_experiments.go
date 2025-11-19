@@ -62,10 +62,10 @@ type FitnessMetrics struct {
 // Change this fitness function as needed!
 func fitness(summary ExperimentSummary, params ExperimentParams) (FitnessMetrics, float64) {
 	metrics := FitnessMetrics{
-		DiffLiveDead: (math.Abs(summary.Results[0].Frequencies[3].TNMS-summary.Results[1].Frequencies[3].TNMS) +
-			math.Abs(summary.Results[0].Frequencies[1].TNMS-summary.Results[1].Frequencies[1].TNMS) +
-			math.Abs(summary.Results[0].Frequencies[2].TNMS-summary.Results[1].Frequencies[2].TNMS)) / 3.0,
-		DeadDecay: summary.Results[1].Frequencies[2].TNMS,
+		DiffLiveDead: (math.Abs(summary.Results[0].Frequencies[3].T30MS-summary.Results[1].Frequencies[3].T30MS) +
+			math.Abs(summary.Results[0].Frequencies[1].T30MS-summary.Results[1].Frequencies[1].T30MS) +
+			math.Abs(summary.Results[0].Frequencies[2].T30MS-summary.Results[1].Frequencies[2].T30MS)) / 3.0,
+		DeadDecay: summary.Results[1].Frequencies[2].T30MS,
 	}
 
 	return metrics, metrics.DiffLiveDead

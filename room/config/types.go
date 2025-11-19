@@ -155,10 +155,35 @@ type Decay struct {
 	PointPairs      []PointPair `yaml:"point_pairs"`
 }
 
+type Microphone struct {
+	Type     string  `yaml:"type"`
+	Normal   Point   `yaml:"normal"`
+	Position Point   `yaml:"position"`
+	BackDB   float64 `yaml:"back_db,omitempty"`
+}
+
+func (m Microphone) Unmarshal() room.Microphone {
+	if m.Type == "cardioid" {
+		return room.Cardioid{
+			Pos: room.V(m.Position.X, m.Position.Y, m.Position.Z),
+			Normal: room.V(
+				m.Normal.X,
+				m.Normal.Y,
+				m.Normal.Z,
+			),
+			BackDB: m.BackDB,
+		}
+	} else {
+		return room.Omni{
+			Pos: room.V(m.Position.X, m.Position.Y, m.Position.Z),
+		}
+	}
+}
+
 type PointPair struct {
-	Name   string `yaml:"name,omitempty"`
-	Source Point  `yaml:"source"`
-	Listen Point  `yaml:"listen"`
+	Name       string     `yaml:"name,omitempty"`
+	Source     Point      `yaml:"source"`
+	Microphone Microphone `yaml:"microphone"`
 }
 
 type Point struct {
