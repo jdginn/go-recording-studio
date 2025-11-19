@@ -270,7 +270,7 @@ func (c SimulateCmd) Run() (err error) {
 		for _, source := range sources {
 			for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
 				totalShots += 1
-				arrival, err := room.TraceShot(shot, listenPos, goroom.TraceParams{
+				arrival, err := room.TraceShot(shot, goroom.Omni{Pos: listenPos}, goroom.TraceParams{
 					Order:         config.Simulation.Order,
 					GainThreshold: config.Simulation.GainThresholdDB,
 					TimeThreshold: config.Simulation.TimeThresholdMS * MS,
@@ -319,7 +319,7 @@ func (c SimulateCmd) Run() (err error) {
 			cfArrivals := []goroom.Arrival{}
 			for _, source := range sources {
 				for _, shot := range source.Sample(config.Simulation.ShotCount, config.Simulation.ShotAngleRange, config.Simulation.ShotAngleRange) {
-					arrival, err := cfRoom.TraceShot(shot, listenPos, goroom.TraceParams{
+					arrival, err := cfRoom.TraceShot(shot, goroom.Omni{Pos: listenPos}, goroom.TraceParams{
 						Order:         config.Simulation.Order,
 						GainThreshold: config.Simulation.GainThresholdDB,
 						TimeThreshold: config.Simulation.TimeThresholdMS * MS,
@@ -619,12 +619,12 @@ func (c TraceCmd) Run() (err error) {
 		normal := targetPos.Sub(source.Position).Normalize()
 		for _, shot := range source.SampleWithNormal(normal, c.ShotCount, c.Spread, c.Spread) {
 			totalShots += 1
-			arrival, err := room.TraceShotUnconditional(shot, listenPos, goroom.TraceParams{
+			arrival, err := room.TraceShotUnconditional(shot, goroom.Omni{Pos: listenPos}, goroom.TraceParams{
 				Order:         config.Simulation.Order,
 				GainThreshold: config.Simulation.GainThresholdDB,
 				TimeThreshold: config.Simulation.TimeThresholdMS * MS,
 				RFZRadius:     config.Simulation.RFZRadius,
-			})
+			}, 1000.0)
 			if err != nil {
 				summary.AddError(goroom.ErrSimulation, err)
 				return err

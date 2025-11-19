@@ -119,12 +119,13 @@ func rayHemisphereIntersection(ray pt.Ray, center pt.Vector, radius float64) (pt
 // TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
 //
 // See the Params struct type.
-func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]Arrival, error) {
+func (r *Room) TraceShot(shot Shot, mic Microphone, params TraceParams) ([]Arrival, error) {
 	arrivals := []Arrival{}
 	mesh, err := r.mesh()
 	if err != nil {
 		return arrivals, err
 	}
+	listenPos := mic.Position()
 	directDistance := shot.Ray.Origin.Sub(listenPos).Length()
 	currentRay := shot.Ray
 	gainFromReflections := shot.Gain
@@ -172,13 +173,17 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 			// Gain decreases with the square of distance ("the 6dB rule")
 			gainFromDistance := 1 / math.Pow(totalDist/directDistance, 2)
 
+			// Apply microphone directional gain
+			micGain := mic.DirectionalGain(currentRay.Direction)
+			totalGain := gainFromDistance * gainFromReflections * micGain
+
 			arrivals = append(arrivals, Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
 				GainFromReflections:     gainFromReflections,
 				GainFromDistance:        gainFromDistance,
-				Gain:                    gainFromDistance * gainFromReflections,
+				Gain:                    totalGain,
 				Distance:                totalDist,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
@@ -192,12 +197,13 @@ func (r *Room) TraceShot(shot Shot, listenPos pt.Vector, params TraceParams) ([]
 // TraceShot traces the path taken by a shot until it either arrives at the RFZ or satisfies the othe criteria in params.
 //
 // See the Params struct type.
-func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params TraceParams, freq float64) ([]Arrival, error) {
+func (r *Room) TraceShotUnconditional(shot Shot, mic Microphone, params TraceParams, freq float64) ([]Arrival, error) {
 	arrivals := []Arrival{}
 	mesh, err := r.mesh()
 	if err != nil {
 		return arrivals, err
 	}
+	listenPos := mic.Position()
 	directDistance := shot.Ray.Origin.Sub(listenPos).Length()
 	currentRay := shot.Ray
 	gainFromReflections := shot.Gain
@@ -229,13 +235,17 @@ func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params Tra
 		pastGainThresh := toDB(totalGain) <= params.GainThreshold
 		pastTimeThresh := distance/SPEED_OF_SOUND > params.TimeThreshold
 		if pastMaxOrder || pastGainThresh || pastTimeThresh {
+			// Apply microphone directional gain
+			micGain := mic.DirectionalGain(currentRay.Direction)
+			totalGainWithMic := totalGain * micGain
+
 			arrivals = append(arrivals, Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
 				GainFromReflections:     gainFromReflections,
 				GainFromDistance:        gainFromDistance,
-				Gain:                    totalGain,
+				Gain:                    totalGainWithMic,
 				Distance:                distance,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: info.Position,
@@ -256,13 +266,17 @@ func (r *Room) TraceShotUnconditional(shot Shot, listenPos pt.Vector, params Tra
 			// Gain decreases with the square of distance ("the 6dB rule")
 			gainFromDistance := 1 / math.Pow(totalDist/directDistance, 2)
 
+			// Apply microphone directional gain
+			micGain := mic.DirectionalGain(currentRay.Direction)
+			totalGain := gainFromReflections * gainFromDistance * micGain
+
 			arrivals = append(arrivals, Arrival{
 				Shot:                    shot,
 				LastReflection:          info.Position,
 				AllReflections:          hitPositions,
 				GainFromReflections:     gainFromReflections,
 				GainFromDistance:        gainFromDistance,
-				Gain:                    gainFromReflections * gainFromDistance,
+				Gain:                    totalGain,
 				Distance:                totalDist,
 				NearestApproachDistance: nearestApproach(currentRay, listenPos),
 				NearestApproachPosition: pos,
