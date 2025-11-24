@@ -96,6 +96,15 @@ type traceParams struct {
 	RFZRadius       float64
 }
 
+type annotations struct {
+	Arrivals map[string]map[string][]simplifiedArrival `json:"arrivals"`
+}
+
+type simplifiedArrival struct {
+	ITD  float64 `json:"itd_ms"`
+	Gain float64 `json:"gain"`
+}
+
 func traceArrivals(room *goroom.Room, source *goroom.Speaker, mic room.Microphone, normal pt.Vector, config traceParams, freq float64) []goroom.Arrival {
 	arrivalsChan := make(chan []goroom.Arrival, config.ShotCount)
 
@@ -683,9 +692,12 @@ func (c SimulateCmd) Run() (err error) {
 		},
 		Results: map[string]PointPairResult{},
 	}
-
+	annotations := annotations{
+		Arrivals: map[string]map[string][]simplifiedArrival{},
+	}
 	for _, pair := range config.Decay.PointPairs {
 		fmt.Printf("%s:\n", pair.Name)
+		annotations.Arrivals[pair.Name] = map[string][]simplifiedArrival{}
 		sourcePos := pair.Source.ToVector()
 		mic := pair.Microphone.Unmarshal()
 		source := goroom.NewSpeaker(speakerSpec, sourcePos, normal, fmt.Sprintf(pair.Name+"_source")) // Normal direction doesn't matter for omnidirectional source
@@ -697,6 +709,14 @@ func (c SimulateCmd) Run() (err error) {
 		}
 		for _, freq := range testFrequencies {
 			arrivals := traceArrivals(room, &source, mic, normal, params, freq)
+			simplifiedArrivals := make([]simplifiedArrival, len(arrivals))
+			for i, a := range arrivals {
+				simplifiedArrivals[i] = simplifiedArrival{
+					ITD:  a.ITD(),
+					Gain: a.Gain,
+				}
+			}
+			annotations.Arrivals[pair.Name][fmt.Sprintf("%.0f", freq)] = simplifiedArrivals
 
 			t30 := computeTNFromArrivals(arrivals, config.Decay, -30)
 			t20 := computeTNFromArrivals(arrivals, config.Decay, -20)
@@ -716,13 +736,21 @@ func (c SimulateCmd) Run() (err error) {
 		summary.Results[pair.Name] = pairRes
 	}
 
-	summaryPath := expDir.Path + "/summary.json"
-	jsonBytes, err := json.MarshalIndent(summary, "", "  ")
+	annotationsPath := expDir.Path + "/annotations.json"
+	annotationBytes, err := json.MarshalIndent(annotations, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal summary: %w", err)
+		fmt.Printf("failed to marshal annotations: %w", err)
 	}
-	if err := os.WriteFile(summaryPath, jsonBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write summary.json: %w", err)
+	if err := os.WriteFile(annotationsPath, annotationBytes, 0644); err != nil {
+		fmt.Printf("failed to write annotations.json: %w", err)
+	}
+	summaryPath := expDir.Path + "/summary.json"
+	summaryBytes, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		fmt.Printf("failed to marshal summary: %w", err)
+	}
+	if err := os.WriteFile(summaryPath, summaryBytes, 0644); err != nil {
+		fmt.Printf("failed to write summary.json: %w", err)
 	}
 	fmt.Printf("Summary JSON written to: %s\n", summaryPath)
 
