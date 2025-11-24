@@ -18,18 +18,19 @@ type ExperimentMetadata struct {
 	Timestamp  string `json:"timestamp"`
 }
 type FrequencyTNResult struct {
-	FreqHz float64 `json:"freq_hz"`
-	TNMS   float64 `json:"tn_ms"`
+	T20MS            float64 `json:"t20_ms"`
+	T30MS            float64 `json:"t30_ms"`
+	EchoDensityScore float64 `json:"echo_density_score"`
+	TemporalKurtosis float64 `json:"temporal_kurtosis"`
 }
 type PointPairResult struct {
-	PointPair   string              `json:"point_pair"`
-	SourcePos   [3]float64          `json:"source_pos"`
-	ListenPos   [3]float64          `json:"listen_pos"`
-	Frequencies []FrequencyTNResult `json:"frequencies"`
+	SourcePos [3]float64 `json:"source_pos"`
+	// Microphone  room.Microphone           `json:"microphone"`
+	Frequencies map[int]FrequencyTNResult `json:"frequencies"`
 }
 type ExperimentSummary struct {
-	Experiment ExperimentMetadata `json:"experiment"`
-	Results    []PointPairResult  `json:"results"`
+	Experiment ExperimentMetadata         `json:"experiment"`
+	Results    map[string]PointPairResult `json:"results"`
 }
 
 type traceParams struct {
@@ -54,22 +55,215 @@ type ExperimentParams struct {
 	RFinishOffset   float64 `json:"r_finish_offset"`
 }
 
+type PositionMetrics struct {
+	Name             string
+	T20MS            float64
+	T30MS            float64
+	EchoDensity      float64
+	TemporalKurtosis float64
+}
+
+func (pm PositionMetrics) String() string {
+	return fmt.Sprintf("%s: T20MS: %.2f, T30MS: %.2f, EchoDensity: %.2f, TemporalKurtosis: %.2f", pm.Name, pm.T20MS, pm.T30MS, pm.EchoDensity, pm.TemporalKurtosis)
+}
+
 type FitnessMetrics struct {
-	DiffLiveDead float64 // average
-	DeadDecay    float64
+	DrumDeadT20      float64
+	DrumDeadT30      float64
+	DrumDeadPos      string
+	DrumDiffT20      float64
+	DrumDiffT30      float64
+	DrumLivePos      string
+	DrumDiffusion    float64
+	VocalDiffT20     float64
+	VocalDiffT30     float64
+	VocalDeadPos     string
+	VocalLivePos     string
+	VocalDiffusion   float64
+	LiveT20          float64
+	LiveT30          float64
+	SpacingAsymmetry float64
+}
+
+func avg[T any](keys []T, f func(T) float64) float64 {
+	var sum float64
+	for _, k := range keys {
+		sum += f(k)
+	}
+	return sum / float64(len(keys))
+}
+
+func pickMin[T any](keys []T, f func(T) float64) T {
+	min := f(keys[0])
+	minKey := keys[0]
+	for _, k := range keys[1:] {
+		v := f(k)
+		if v < min {
+			min = v
+			minKey = k
+		}
+	}
+	return minKey
+}
+
+func pickMax[T any](keys []T, f func(T) float64) T {
+	max := f(keys[0])
+	maxKey := keys[0]
+	for _, k := range keys[1:] {
+		v := f(k)
+		if v > max {
+			max = v
+			maxKey = k
+		}
+	}
+	return maxKey
+}
+
+func calcPositionMetrics(summary ExperimentSummary, names []string, freqs []int) []PositionMetrics {
+	var metrics []PositionMetrics
+	for _, name := range names {
+		t20 := avg(freqs, func(freq int) float64 {
+			return summary.Results[name].Frequencies[freq].T20MS
+		})
+		t30 := avg(freqs, func(freq int) float64 {
+			return summary.Results[name].Frequencies[freq].T30MS
+		})
+		echoDensity := avg(freqs, func(freq int) float64 {
+			return summary.Results[name].Frequencies[freq].EchoDensityScore
+		})
+		temporalKurtosis := avg(freqs, func(freq int) float64 {
+			return summary.Results[name].Frequencies[freq].TemporalKurtosis
+		})
+		metrics = append(metrics, PositionMetrics{
+			Name:             name,
+			T20MS:            t20,
+			T30MS:            t30,
+			EchoDensity:      echoDensity,
+			TemporalKurtosis: temporalKurtosis,
+		})
+	}
+	return metrics
 }
 
 // Change this fitness function as needed!
 func fitness(summary ExperimentSummary, params ExperimentParams) (FitnessMetrics, float64) {
 	metrics := FitnessMetrics{
-		DiffLiveDead: (math.Abs(summary.Results[0].Frequencies[3].T30MS-summary.Results[1].Frequencies[3].T30MS) +
-			math.Abs(summary.Results[0].Frequencies[1].T30MS-summary.Results[1].Frequencies[1].T30MS) +
-			math.Abs(summary.Results[0].Frequencies[2].T30MS-summary.Results[1].Frequencies[2].T30MS)) / 3.0,
-		DeadDecay: summary.Results[1].Frequencies[2].T30MS,
+		DrumDeadPos: pickMin([]string{"window_drums_OH_back_cardioid", "window_drums_OH_cardioid", "door_drums_OH_cardioid", "door_drums_OH_back_cardioid"}, func(name string) float64 {
+			return avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+				return summary.Results[name].Frequencies[freq].T20MS
+			})
+		}),
+		DrumLivePos: pickMax([]string{"window_drums_far_omni", "door_drums_room_omni"}, func(name string) float64 {
+			return avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+				return summary.Results[name].Frequencies[freq].T20MS
+			})
+		}),
+		VocalDeadPos: pickMin([]string{"vox_center_to_window", "vox_center_to_door", "vox_door_to_window", "vox_door_to_door", "vox_window_to_window", "vox_window_to_door"}, func(name string) float64 {
+			return avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+				return summary.Results[name].Frequencies[freq].T30MS
+			})
+		}),
+		VocalLivePos: pickMax([]string{"vox_center_to_window", "vox_center_to_door", "vox_door_to_window", "vox_door_to_door", "vox_window_to_window", "vox_window_to_door"}, func(name string) float64 {
+			return avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+				return summary.Results[name].Frequencies[freq].T30MS
+			})
+		}),
+		DrumDeadT20: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			key := pickMin([]string{"window_drums_OH_back_cardioid", "window_drums_OH_cardioid", "door_drums_OH_cardioid", "door_drums_OH_back_cardioid"}, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T20MS
+			})
+			return summary.Results[key].Frequencies[freq].T20MS
+		}),
+		DrumDeadT30: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			key := pickMin([]string{"window_drums_OH_back_cardioid", "window_drums_OH_cardioid", "door_drums_OH_cardioid", "door_drums_OH_back_cardioid"}, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T30MS
+			})
+			return summary.Results[key].Frequencies[freq].T30MS
+		}),
+		DrumDiffT20: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			live := summary.Results["window_drums_far_omni"].Frequencies[freq].T20MS
+			deadKey := pickMin([]string{"window_drums_OH_back_cardioid", "window_drums_OH_cardioid", "door_drums_OH_cardioid", "door_drums_OH_back_cardioid"}, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T20MS
+			})
+			dead := summary.Results[deadKey].Frequencies[freq].T20MS
+			return live - dead
+		}),
+		DrumDiffT30: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			live := summary.Results["window_drums_far_omni"].Frequencies[freq].T30MS
+			deadKey := pickMin([]string{"window_drums_OH_back_cardioid", "window_drums_OH_cardioid", "door_drums_OH_cardioid", "door_drums_OH_back_cardioid"}, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T30MS
+			})
+			dead := summary.Results[deadKey].Frequencies[freq].T30MS
+			return live - dead
+		}),
+		DrumDiffusion: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			f := func(names []string) float64 {
+				sum := 0.0
+				for _, name := range names {
+					sum += summary.Results[name].Frequencies[freq].EchoDensityScore + summary.Results[name].Frequencies[freq].TemporalKurtosis
+				}
+				return sum / float64(len(names))
+			}
+			return f([]string{"window_drums_far_omni", "window_drums_OH_omni", "door_drums_OH_omni", "door_drums_room_omni"})
+		}),
+		VocalDiffT30: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			options := []string{"vox_center_to_door", "vox_center_to_window", "vox_door_to_door", "vox_door_to_window", "vox_window_to_door", "vox_window_to_window"}
+			liveKey := pickMax(options, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T30MS
+			})
+			live := summary.Results[liveKey].Frequencies[freq].T30MS
+			deadKey := pickMin(options, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T30MS
+			})
+			dead := summary.Results[deadKey].Frequencies[freq].T30MS
+			return live - dead
+		}),
+		VocalDiffT20: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			options := []string{"vox_center_to_door", "vox_center_to_window", "vox_center_to_wall", "vox_door_to_door", "vox_door_to_window", "vox_window_to_door", "vox_window_to_window"}
+			liveKey := pickMax(options, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T20MS
+			})
+			live := summary.Results[liveKey].Frequencies[freq].T20MS
+			deadKey := pickMin(options, func(name string) float64 {
+				return summary.Results[name].Frequencies[freq].T20MS
+			})
+			dead := summary.Results[deadKey].Frequencies[freq].T20MS
+			return live - dead
+		}),
+		VocalDiffusion: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			f := func(names []string) float64 {
+				sum := 0.0
+				for _, name := range names {
+					sum += summary.Results[name].Frequencies[freq].EchoDensityScore + summary.Results[name].Frequencies[freq].TemporalKurtosis
+				}
+				return sum / float64(len(names))
+			}
+			return f([]string{"vox_center_to_window", "vox_center_to_door"})
+		}),
+		LiveT20: avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+			f := func(names []string) float64 {
+				sum := 0.0
+				for _, name := range names {
+					sum += summary.Results[name].Frequencies[freq].T20MS
+				}
+				return sum / float64(len(names))
+			}
+			return f([]string{"window_drums_far_omni", "door_drums_room_omni", "vox_center_to_window", "vox_center_to_door"})
+		}),
 	}
-
-	return metrics, metrics.DiffLiveDead
-	// return metrics, metrics.DiffLiveDead*2 - metrics.DeadDecay - (params.LReflectorDepth+params.RReflectorDepth)/2 - (params.LNumReflectors+params.RNumReflectors)/5
+	metrics.LiveT30 = avg([]int{500, 1000, 2000, 4000}, func(freq int) float64 {
+		f := func(names []string) float64 {
+			sum := 0.0
+			for _, name := range names {
+				sum += summary.Results[name].Frequencies[freq].T30MS
+			}
+			return sum / float64(len(names))
+		}
+		return f([]string{"window_drums_far_omni", "door_drums_room_omni", "vox_center_to_window", "vox_center_to_door"})
+	})
+	metrics.SpacingAsymmetry = math.Abs(params.LFinishOffset-params.RFinishOffset) + math.Abs(params.LStartOffset-params.RStartOffset)
+	fitness := metrics.VocalDiffT30 + metrics.DrumDiffT30 - metrics.DrumDeadT30 + (metrics.DrumDiffusion+metrics.VocalDiffusion)*30 - metrics.SpacingAsymmetry
+	return metrics, fitness
 }
 
 func main() {
@@ -154,7 +348,7 @@ func main() {
 		return candidates[i].Fitness > candidates[j].Fitness
 	})
 
-	nCandidates := 5
+	nCandidates := 1
 	fmt.Printf("Top %d experiments (of %d found):\n", nCandidates, len(candidates))
 	for i := 0; i < len(candidates) && i < nCandidates; i++ {
 		c := candidates[i]
@@ -163,8 +357,29 @@ func main() {
 		fmt.Printf("    Fitness: %.6f\n", c.Fitness)
 
 		fmt.Printf("    Fitness Metrics:\n")
-		fmt.Printf("      DiffLiveDead: %.6f\n", c.Metrics.DiffLiveDead)
-		fmt.Printf("      DeadDecay:    %.6f\n", c.Metrics.DeadDecay)
+		fmt.Printf("      DrumDeadT20:    %.6f\n", c.Metrics.DrumDeadT20)
+		fmt.Printf("      DrumDeadT30:    %.6f\n", c.Metrics.DrumDeadT30)
+		fmt.Printf("      DrumDiffT20:    %.6f\n", c.Metrics.DrumDiffT20)
+		fmt.Printf("      DrumDiffT30:    %.6f\n", c.Metrics.DrumDiffT30)
+		fmt.Printf("      DrumDiffusion:  %.6f\n", c.Metrics.DrumDiffusion)
+		fmt.Printf("      VocalDiffT20:   %.6f\n", c.Metrics.VocalDiffT20)
+		fmt.Printf("      VocalDiffT30:   %.6f\n", c.Metrics.VocalDiffT30)
+		fmt.Printf("      VocalDiffusion: %.6f\n", c.Metrics.VocalDiffusion)
+		fmt.Printf("      LiveT20:        %.6f\n", c.Metrics.LiveT20)
+		fmt.Printf("      LiveT30:        %.6f\n", c.Metrics.LiveT30)
+		fmt.Printf("      SpacingAsymmetry: %.6f\n", c.Metrics.SpacingAsymmetry)
+		fmt.Printf("      Drum Dead Position: %s\n", c.Metrics.DrumDeadPos)
+		fmt.Printf("      Drum Live Position: %s\n", c.Metrics.DrumLivePos)
+		fmt.Printf("      Vocal Dead Position: %s\n", c.Metrics.VocalDeadPos)
+		fmt.Printf("      Vocal Live Position: %s\n", c.Metrics.VocalLivePos)
+
+		fmt.Printf("     Position Metrics:\n")
+		for _, metrics := range calcPositionMetrics(c.Summary, []string{"window_drums_OH_omni", "window_drums_OH_cardioid", "window_drums_OH_back_cardioid", "window_drums_far_omni", "door_drums_OH_omni", "door_drums_OH_cardioid", "door_drums_OH_back_cardioid", "door_drums_room_omni"}, []int{500, 1000, 2000, 4000}) {
+			fmt.Printf("      %s\n", metrics.String())
+		}
+		for _, metrics := range calcPositionMetrics(c.Summary, []string{"vox_center_to_window", "vox_center_to_door", "vox_door_to_window", "vox_door_to_door", "vox_window_to_window", "vox_window_to_door"}, []int{500, 1000, 2000, 4000}) {
+			fmt.Printf("      %s\n", metrics.String())
+		}
 
 		fmt.Printf("    Params:\n")
 		fmt.Printf("      l_num_reflectors:    %.2f\n", c.Params.LNumReflectors)
@@ -179,28 +394,37 @@ func main() {
 		fmt.Printf("      r_finish_offset:     %.2f\n", c.Params.RFinishOffset)
 		fmt.Printf("------------------------------------------------------\n\n")
 	}
-	fmt.Printf("Bottom %d experiments (of %d found):\n", nCandidates, len(candidates))
-	for i := len(candidates) - 1; i >= 0 && i >= len(candidates)-nCandidates; i-- {
-		c := candidates[i]
-		fmt.Printf("------------------------------------------------------\n")
-		fmt.Printf("%2d. Experiment: %s\n", i+1, filepath.Base(c.Path))
-		fmt.Printf("    Fitness: %.6f\n", c.Fitness)
-
-		fmt.Printf("    Fitness Metrics:\n")
-		fmt.Printf("      DiffLiveDead: %.6f\n", c.Metrics.DiffLiveDead)
-		fmt.Printf("      DeadDecay:    %.6f\n", c.Metrics.DeadDecay)
-
-		fmt.Printf("    Params:\n")
-		fmt.Printf("      l_num_reflectors:    %.2f\n", c.Params.LNumReflectors)
-		fmt.Printf("      l_reflector_angle:   %.2f\n", c.Params.LReflectorAngle)
-		fmt.Printf("      l_reflector_depth:   %.2f\n", c.Params.LReflectorDepth)
-		fmt.Printf("      l_start_offset:      %.2f\n", c.Params.LStartOffset)
-		fmt.Printf("      l_finish_offset:     %.2f\n", c.Params.LFinishOffset)
-		fmt.Printf("      r_num_reflectors:    %.2f\n", c.Params.RNumReflectors)
-		fmt.Printf("      r_reflector_angle:   %.2f\n", c.Params.RReflectorAngle)
-		fmt.Printf("      r_reflector_depth:   %.2f\n", c.Params.RReflectorDepth)
-		fmt.Printf("      r_start_offset:      %.2f\n", c.Params.RStartOffset)
-		fmt.Printf("      r_finish_offset:     %.2f\n", c.Params.RFinishOffset)
-		fmt.Printf("------------------------------------------------------\n\n")
-	}
+	// fmt.Printf("Bottom %d experiments (of %d found):\n", nCandidates, len(candidates))
+	// for i := len(candidates) - 1; i >= 0 && i >= len(candidates)-nCandidates; i-- {
+	// 	c := candidates[i]
+	// 	fmt.Printf("------------------------------------------------------\n")
+	// 	fmt.Printf("%2d. Experiment: %s\n", i+1, filepath.Base(c.Path))
+	// 	fmt.Printf("    Fitness: %.6f\n", c.Fitness)
+	//
+	// 	fmt.Printf("    Fitness Metrics:\n")
+	// 	fmt.Printf("      DrumDeadT20:    %.6f\n", c.Metrics.DrumDeadT20)
+	// 	fmt.Printf("      DrumDeadT30:    %.6f\n", c.Metrics.DrumDeadT30)
+	// 	fmt.Printf("      DrumDiffT20:    %.6f\n", c.Metrics.DrumDiffT20)
+	// 	fmt.Printf("      DrumDiffT30:    %.6f\n", c.Metrics.DrumDiffT30)
+	// 	fmt.Printf("      DrumDiffusion:  %.6f\n", c.Metrics.DrumDiffusion)
+	// 	fmt.Printf("      VocalDiffT20:   %.6f\n", c.Metrics.VocalDiffT20)
+	// 	fmt.Printf("      VocalDiffT30:   %.6f\n", c.Metrics.VocalDiffT30)
+	// 	fmt.Printf("      VocalDiffusion: %.6f\n", c.Metrics.VocalDiffusion)
+	// 	fmt.Printf("      LiveT20:        %.6f\n", c.Metrics.LiveT20)
+	// 	fmt.Printf("      LiveT30:        %.6f\n", c.Metrics.LiveT30)
+	// 	fmt.Printf("      SpacingAsymmetry: %.6f\n", c.Metrics.SpacingAsymmetry)
+	//
+	// 	fmt.Printf("    Params:\n")
+	// 	fmt.Printf("      l_num_reflectors:    %.2f\n", c.Params.LNumReflectors)
+	// 	fmt.Printf("      l_reflector_angle:   %.2f\n", c.Params.LReflectorAngle)
+	// 	fmt.Printf("      l_reflector_depth:   %.2f\n", c.Params.LReflectorDepth)
+	// 	fmt.Printf("      l_start_offset:      %.2f\n", c.Params.LStartOffset)
+	// 	fmt.Printf("      l_finish_offset:     %.2f\n", c.Params.LFinishOffset)
+	// 	fmt.Printf("      r_num_reflectors:    %.2f\n", c.Params.RNumReflectors)
+	// 	fmt.Printf("      r_reflector_angle:   %.2f\n", c.Params.RReflectorAngle)
+	// 	fmt.Printf("      r_reflector_depth:   %.2f\n", c.Params.RReflectorDepth)
+	// 	fmt.Printf("      r_start_offset:      %.2f\n", c.Params.RStartOffset)
+	// 	fmt.Printf("      r_finish_offset:     %.2f\n", c.Params.RFinishOffset)
+	// 	fmt.Printf("------------------------------------------------------\n\n")
+	// }
 }
