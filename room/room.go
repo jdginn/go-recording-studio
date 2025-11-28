@@ -405,9 +405,9 @@ func (r *Room) findTriangleIndexByCentroid(targetCentroid pt.Vector) int {
 	return -1
 }
 
-// isInnermost returns true if the given triangle is visible from the room interior
+// IsInnermost returns true if the given triangle is visible from the room interior
 // and its geometric normal points inward (toward the room center).
-func (r *Room) isInnermost(triangle pt.TriangleInt) bool {
+func (r *Room) IsInnermost(triangle pt.TriangleInt) bool {
 	center := r.M.BoundingBox().Center()
 	centroid := triangleCentroid(triangle)
 
@@ -537,7 +537,7 @@ func (r *Room) InteriorMesh() (*pt.Mesh, error) {
 	newTriangles := []pt.TriangleInt{}
 
 	for _, tri := range r.M.Triangles {
-		if r.isInnermost(tri) {
+		if r.IsInnermost(tri) {
 			newTriangles = append(newTriangles, tri)
 		} else {
 			// fmt.Printf("Not innermost: %v\n", tri.(*Triangle).Surface.Name)
@@ -612,7 +612,7 @@ const (
 func (r *Room) T60Sabine(freq float64) (float64, error) {
 	sabines := 0.0
 	for _, tri := range r.M.Triangles {
-		if r.isInnermost(tri) {
+		if r.IsInnermost(tri) {
 			sabines += tri.(*Triangle).Surface.Material.Alpha(freq) * tri.T().Area()
 			if tri.T().Area() < 0. {
 				fmt.Printf("Negative area triangle detected: %+v\n", tri.T())
