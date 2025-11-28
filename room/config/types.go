@@ -64,6 +64,7 @@ type Materials struct {
 
 type Material struct {
 	Absorption map[float64]float64 `yaml:"absorption"`
+	Depth      float64             `yaml:"depth,omitempty"`
 }
 
 type SurfaceAssignments struct {

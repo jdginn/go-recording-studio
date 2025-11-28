@@ -47,6 +47,13 @@ func LoadFromFile(path string, opts LoadOptions) (*ExperimentConfig, error) {
 		}
 	}
 
+	for k, material := range config.Materials.Inline {
+		if material.Depth == 0 {
+			material.Depth = -1
+			config.Materials.Inline[k] = material
+		}
+	}
+
 	return config, nil
 }
 
