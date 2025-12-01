@@ -37,6 +37,14 @@ func main() {
 		jsonPath := filepath.Join(inputDir, base+".json")
 		threePath := filepath.Join(inputDir, name)
 
+		fmt.Printf("Checking if %s exists\n", filepath.Join(inputDir, base+"-results"))
+		// Check if results dir already exists. If so, skip.
+		info, err := os.Stat(filepath.Join(inputDir, base+"-results"))
+		if err == nil && info.IsDir() {
+			fmt.Printf("Skipping %s: results already exist\n", name)
+			continue
+		}
+
 		// Check that JSON exists
 		if _, err := os.Stat(jsonPath); err != nil {
 			fmt.Printf("Skipping %s: no matching json found\n", name)
